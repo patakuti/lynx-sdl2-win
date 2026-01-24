@@ -37,6 +37,8 @@ orig/
 git-setup/
 *-backup/
 PDCurses-backup/
+project-test/
+win64-libs/
 
 # Test executables
 project-test/test_cjk_display

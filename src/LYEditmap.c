@@ -1305,6 +1305,13 @@ int EditBinding(int xlkc)
 
     if (xlkc == -1)
 	return LYE_NOP;		/* maybe LYE_ABORT? or LYE_FORM_LAC|LYK_UNKNOWN? */
+
+    /*
+     * If the character code is beyond KEYMAP_SIZE (e.g., Unicode characters
+     * like Japanese input from IME), treat it as a regular character input.
+     */
+    if (xlkc >= KEYMAP_SIZE)
+	return LYE_CHAR;
 #ifdef NOT_ASCII
     if (c < 256) {
 	c = TOASCII(c);

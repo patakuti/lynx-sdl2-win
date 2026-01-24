@@ -60,6 +60,9 @@ char *XCursesProgramName = "Lynx";
 
 #ifdef PDCURSES
 #undef HAVE_NEWTERM		/* not needed, since /dev/tty is unused */
+#ifdef PDC_WIDE
+#include <wcwidth.h>		/* for mk_wcwidth - PDCurses SDL2 CJK support */
+#endif
 #endif
 
 #if defined(USE_COLOR_STYLE) && !defined(USE_COLOR_TABLE)
@@ -999,6 +1002,8 @@ static int LYresize_term(int nlines, int ncols)
 #endif
 
 #ifdef USE_MAXSCREEN_TOGGLE
+#ifndef PDCURSES_SDL2
+/* Windows Console API version */
 static HWND currentWindowHandle = NULL;
 static char dummyWindowTitle[256];
 
@@ -1156,7 +1161,76 @@ void recoverWindowSize(void)
 	CTRACE((tfp, "scrsize_{xy} is not saved yet.\n"));
     }
 }
-#endif
+#else /* SDL2 version */
+#include <SDL.h>
+extern SDL_Window *pdc_window;
+extern int pdc_sheight, pdc_swidth, pdc_yoffset, pdc_xoffset;
+extern int pdc_fheight, pdc_fwidth;
+
+static int saved_win_x = 0, saved_win_y = 0;
+static int saved_win_w = 0, saved_win_h = 0;
+static BOOLEAN is_maximized = FALSE;
+
+/* Helper: update PDCurses internal size and call resize_term with calculated values */
+static void do_resize_from_window(void)
+{
+    int w, h, lines, cols, rc;
+    SDL_GetWindowSize(pdc_window, &w, &h);
+    pdc_swidth = w - pdc_xoffset;
+    pdc_sheight = h - pdc_yoffset;
+    lines = pdc_sheight / pdc_fheight;
+    cols = pdc_swidth / pdc_fwidth;
+    CTRACE((tfp, "do_resize_from_window: window=%dx%d, pdc_size=%dx%d, fsize=%dx%d, lines=%d, cols=%d\n",
+	    w, h, pdc_swidth, pdc_sheight, pdc_fwidth, pdc_fheight, lines, cols));
+    rc = resize_term(lines, cols);
+    CTRACE((tfp, "After resize_term(%d): LINES=%d, COLS=%d, pdc_size=%dx%d\n",
+	    rc, LINES, COLS, pdc_swidth, pdc_sheight));
+    LYGetScreenSize(0);
+    CTRACE((tfp, "After LYGetScreenSize: LYlines=%d, LYcols=%d\n", LYlines, LYcols));
+}
+
+void maxmizeWindowSize(void)
+{
+    CTRACE((tfp, "maxmizeWindowSize() called: is_maximized=%d, pdc_window=%p\n",
+	    is_maximized, (void *)pdc_window));
+    if (!is_maximized && pdc_window) {
+	SDL_GetWindowPosition(pdc_window, &saved_win_x, &saved_win_y);
+	SDL_GetWindowSize(pdc_window, &saved_win_w, &saved_win_h);
+	CTRACE((tfp, "Saved window pos=(%d,%d), size=%dx%d\n",
+		saved_win_x, saved_win_y, saved_win_w, saved_win_h));
+	SDL_MaximizeWindow(pdc_window);
+	is_maximized = TRUE;
+	/* Wait for SDL to process window resize event */
+	SDL_Delay(100);
+	SDL_PumpEvents();
+	do_resize_from_window();
+	recent_sizechange = TRUE;
+	CTRACE((tfp, "Window maximized, recent_sizechange=TRUE\n"));
+    }
+}
+
+void recoverWindowSize(void)
+{
+    CTRACE((tfp, "recoverWindowSize() called: is_maximized=%d, pdc_window=%p\n",
+	    is_maximized, (void *)pdc_window));
+    if (is_maximized && pdc_window) {
+	SDL_RestoreWindow(pdc_window);
+	SDL_SetWindowSize(pdc_window, saved_win_w, saved_win_h);
+	SDL_SetWindowPosition(pdc_window, saved_win_x, saved_win_y);
+	is_maximized = FALSE;
+	/* Wait for SDL to process window resize event */
+	SDL_Delay(100);
+	SDL_PumpEvents();
+	do_resize_from_window();
+	recent_sizechange = TRUE;
+	CTRACE((tfp, "Window restored to %dx%d at (%d,%d), recent_sizechange=TRUE\n",
+		saved_win_w, saved_win_h, saved_win_x, saved_win_y));
+    } else {
+	CTRACE((tfp, "Window is not maximized, nothing to do.\n"));
+    }
+}
+#endif /* !PDCURSES_SDL2 */
+#endif /* USE_MAXSCREEN_TOGGLE */
 
 #if defined(USE_DEFAULT_COLORS)
 void restart_curses(void)
@@ -1576,6 +1650,24 @@ void start_curses(void)
 
     LYCursesON = TRUE;
 #if defined(PDCURSES) && defined(PDC_BUILD) && PDC_BUILD >= 2401
+#if defined(PDCURSES_SDL2)
+    {
+	static BOOLEAN sdl2_first_start = TRUE;
+	if (sdl2_first_start && (scrsize_x != 0) && (scrsize_y != 0)) {
+	    /* First start: use config values (SCREEN_SIZE from lynx.cfg) */
+	    CTRACE((tfp, "start_curses SDL2 first start: resizing to config x=%d, y=%d\n",
+		    scrsize_x, scrsize_y));
+	    LYresize_term(scrsize_y, scrsize_x);
+	    sdl2_first_start = FALSE;
+	} else if (!sdl2_first_start) {
+	    CTRACE((tfp, "start_curses SDL2 reload: using current window size\n"));
+	}
+	LYlines = LYscreenHeight();
+	LYcols = LYscreenWidth();
+	LYStatusLine = -1;
+	CTRACE((tfp, "start_curses SDL2: LYlines=%d, LYcols=%d\n", LYlines, LYcols));
+    }
+#else
     if ((scrsize_x != 0) && (scrsize_y != 0)) {
 	if (saved_scrsize_x == 0) {
 	    saved_scrsize_x = COLS;
@@ -1588,7 +1680,7 @@ void start_curses(void)
 	LYcols = LYscreenWidth();
 	LYStatusLine = -1;
 	LYclear();
-#ifdef _WINDOWS
+#if defined(_WINDOWS)
 	adjustWindowPos();
 #endif
     }
@@ -1601,6 +1693,7 @@ void start_curses(void)
 	    saved_scrsize_y2 = scrsize_y;
 	}
     }
+#endif /* PDCURSES_SDL2 */
 #endif
     CTRACE((tfp, "start_curses: done.\n"));
 }				/* end of start_curses() */
@@ -2287,6 +2380,37 @@ void LYwaddnstr(WINDOW * w GCC_UNUSED,
 #endif
     LYGetYX(y0, x0);
 
+#if defined(PDCURSES) && defined(PDC_WIDE)
+    /*
+     * For PDCurses with wide character support, use waddnstr which
+     * handles UTF-8 multibyte sequences correctly via PDC_mbtowc.
+     * We need to handle tabs separately.
+     */
+    {
+	const char *start = src;
+	const char *end = src + len;
+	const char *p;
+
+	for (p = src; p < end; p++) {
+	    if (*p == '\t') {
+		/* Output characters before tab */
+		if (p > start) {
+		    waddnstr(w, start, (int)(p - start));
+		}
+		/* Expand tab */
+		LYGetYX(y, x);
+		while ((++x - x0) % 8)
+		    waddch(w, ' ');
+		waddch(w, ' ');
+		start = p + 1;
+	    }
+	}
+	/* Output remaining characters */
+	if (start < end) {
+	    waddnstr(w, start, (int)(end - start));
+	}
+    }
+#else
     for (inx = 0; inx < len; ++inx) {
 	/*
 	 * Do tab-expansion relative to the base of the string (rather than
@@ -2301,6 +2425,7 @@ void LYwaddnstr(WINDOW * w GCC_UNUSED,
 	    waddch(w, UCH(src[inx]));
 	}
     }
+#endif
 }
 
 /*
@@ -2325,7 +2450,59 @@ int LYstrExtent0(const char *string,
 	used = ((len < 0) ? (int) strlen(string) : len);
     }
     result = used;
-#ifdef WIDEC_CURSES
+#if defined(PDCURSES) && defined(PDC_WIDE)
+    /*
+     * PDCurses doesn't handle CJK character widths in waddch/getyx,
+     * so we calculate cell width directly using mk_wcwidth.
+     * This doesn't require fake_win.
+     */
+    if (non_empty(string) && used > 0) {
+	int x = 0;
+	int n;
+
+	for (n = 0; n < used; ) {
+	    unsigned char ch = (unsigned char)string[n];
+	    if (IsSpecialAttrChar(ch)) {
+		n++;
+		continue;
+	    }
+	    if (ch < 0x80) {
+		/* ASCII */
+		x++;
+		n++;
+	    } else if ((ch & 0xE0) == 0xC0 && n + 1 < used) {
+		/* 2-byte UTF-8 */
+		wchar_t wc = ((ch & 0x1F) << 6) | (string[n+1] & 0x3F);
+		int w = mk_wcwidth(wc);
+		x += (w > 0) ? w : 1;
+		n += 2;
+	    } else if ((ch & 0xF0) == 0xE0 && n + 2 < used) {
+		/* 3-byte UTF-8 (CJK characters are here) */
+		wchar_t wc = ((ch & 0x0F) << 12) |
+			     ((string[n+1] & 0x3F) << 6) |
+			     (string[n+2] & 0x3F);
+		int w = mk_wcwidth(wc);
+		x += (w > 0) ? w : 1;
+		n += 3;
+	    } else if ((ch & 0xF8) == 0xF0 && n + 3 < used) {
+		/* 4-byte UTF-8 */
+		wchar_t wc = ((ch & 0x07) << 18) |
+			     ((string[n+1] & 0x3F) << 12) |
+			     ((string[n+2] & 0x3F) << 6) |
+			     (string[n+3] & 0x3F);
+		int w = mk_wcwidth(wc);
+		x += (w > 0) ? w : 1;
+		n += 4;
+	    } else {
+		/* Invalid UTF-8 or continuation byte, skip */
+		n++;
+	    }
+	    if (x > maxCells)
+		break;
+	}
+	result = (retCellNum ? x : n);
+    }
+#elif defined(WIDEC_CURSES)
     if (non_empty(string) && used > 0 && lynx_called_initscr) {
 	if (fake_max < maxCells) {
 	    fake_max = (maxCells + 1) * 2;

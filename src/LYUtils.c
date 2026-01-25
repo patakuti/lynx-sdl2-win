@@ -2863,6 +2863,7 @@ char *LYFindConfigFile(const char *nominal, const char *dftfile)
 	    FREE(list);
 
 	    if (!found) {
+		FREE(result);  /* Clear result from failed LYNX_CFG_PATH search */
 		/*
 		 * If not found, try finding it in the same directory as the
 		 * compiled-in location of the default file.
@@ -2880,14 +2881,14 @@ char *LYFindConfigFile(const char *nominal, const char *dftfile)
 		    }
 		}
 #ifdef USE_PROGRAM_DIR
-		else {
-		    /*
-		     * Finally, try in the same directory as the executable.
-		     */
+		/*
+		 * Try in the same directory as the executable.
+		 */
+		if (result == 0) {
+		    const char *leafname = LYPathLeaf(nominal);
 		    StrAllocCopy(result, program_dir);
 		    LYAddPathSep(&result);
-		    StrAllocCat(result, nominal);
-		    LYTildeExpand(&result, TRUE);
+		    StrAllocCat(result, leafname);
 		    if (!LYCanReadFile(result)) {
 			FREE(result);
 		    }

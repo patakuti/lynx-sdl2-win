@@ -1664,6 +1664,11 @@ static Config_Type Config_Table [] =
      PARSE_SET(RC_PARTIAL,              display_partial_flag),
      PARSE_INT(RC_PARTIAL_THRES,        partial_threshold),
 #endif
+#ifdef PDCURSES
+     PARSE_ENV(RC_PDC_FONT,             0),
+     PARSE_ENV(RC_PDC_FONT_INDEX,       0),
+     PARSE_ENV(RC_PDC_FONT_SIZE,        0),
+#endif
 #ifdef USE_PERSISTENT_COOKIES
      PARSE_SET(RC_PERSISTENT_COOKIES,   persistent_cookies),
 #endif /* USE_PERSISTENT_COOKIES */

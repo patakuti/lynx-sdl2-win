@@ -5791,25 +5791,7 @@ const char *LYno_attr_mbcs_case_strstr(const char *haystack,
 		 * Calculate width of the first matching character for UTF-8.
 		 */
 		if (utf_flag && count_gcells && is8bits(*haystack)) {
-		    unsigned char ch = (unsigned char)*haystack;
-		    if ((ch & 0xE0) == 0xC0) {
-			wchar_t wc = ((ch & 0x1F) << 6) | (haystack[1] & 0x3F);
-			int w = mk_wcwidth(wc);
-			first_char_width = (w > 0) ? w : 1;
-		    } else if ((ch & 0xF0) == 0xE0) {
-			wchar_t wc = ((ch & 0x0F) << 12) |
-				     ((haystack[1] & 0x3F) << 6) |
-				     (haystack[2] & 0x3F);
-			int w = mk_wcwidth(wc);
-			first_char_width = (w > 0) ? w : 1;
-		    } else if ((ch & 0xF8) == 0xF0) {
-			wchar_t wc = ((ch & 0x07) << 18) |
-				     ((haystack[1] & 0x3F) << 12) |
-				     ((haystack[2] & 0x3F) << 6) |
-				     (haystack[3] & 0x3F);
-			int w = mk_wcwidth(wc);
-			first_char_width = (w > 0) ? w : 1;
-		    }
+		    first_char_width = utf8_char_width(haystack);
 		}
 #endif
 		len += first_char_width;
@@ -6026,25 +6008,7 @@ const char *LYno_attr_mbcs_strstr(const char *haystack,
 		 * Calculate width of the first matching character for UTF-8.
 		 */
 		if (utf_flag && count_gcells && is8bits(*haystack)) {
-		    unsigned char ch = (unsigned char)*haystack;
-		    if ((ch & 0xE0) == 0xC0) {
-			wchar_t wc = ((ch & 0x1F) << 6) | (haystack[1] & 0x3F);
-			int w = mk_wcwidth(wc);
-			first_char_width = (w > 0) ? w : 1;
-		    } else if ((ch & 0xF0) == 0xE0) {
-			wchar_t wc = ((ch & 0x0F) << 12) |
-				     ((haystack[1] & 0x3F) << 6) |
-				     (haystack[2] & 0x3F);
-			int w = mk_wcwidth(wc);
-			first_char_width = (w > 0) ? w : 1;
-		    } else if ((ch & 0xF8) == 0xF0) {
-			wchar_t wc = ((ch & 0x07) << 18) |
-				     ((haystack[1] & 0x3F) << 12) |
-				     ((haystack[2] & 0x3F) << 6) |
-				     (haystack[3] & 0x3F);
-			int w = mk_wcwidth(wc);
-			first_char_width = (w > 0) ? w : 1;
-		    }
+		    first_char_width = utf8_char_width(haystack);
 		}
 #endif
 		len += first_char_width;

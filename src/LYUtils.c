@@ -389,6 +389,45 @@ size_t utf8_length(int utf_flag,
 }
 
 /*
+ * Decode UTF-8 sequence to wchar_t.
+ * Returns 0 if not a valid UTF-8 multi-byte sequence.
+ */
+wchar_t decode_utf8_char(const char *s)
+{
+    unsigned char ch = (unsigned char)s[0];
+    wchar_t wc = 0;
+
+    if ((ch & 0xE0) == 0xC0) {
+	/* 2-byte sequence: 110xxxxx 10xxxxxx */
+	wc = ((ch & 0x1F) << 6) | (s[1] & 0x3F);
+    } else if ((ch & 0xF0) == 0xE0) {
+	/* 3-byte sequence: 1110xxxx 10xxxxxx 10xxxxxx */
+	wc = ((ch & 0x0F) << 12) | ((s[1] & 0x3F) << 6) | (s[2] & 0x3F);
+    } else if ((ch & 0xF8) == 0xF0) {
+	/* 4-byte sequence: 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx */
+	wc = ((ch & 0x07) << 18) | ((s[1] & 0x3F) << 12) |
+	     ((s[2] & 0x3F) << 6) | (s[3] & 0x3F);
+    }
+    return wc;
+}
+
+#if defined(EXP_WCWIDTH_SUPPORT)
+/*
+ * Get the cell width of a UTF-8 character.
+ * Returns 1 for ASCII or invalid sequences.
+ */
+int utf8_char_width(const char *s)
+{
+    wchar_t wc = decode_utf8_char(s);
+    if (wc > 0) {
+	int w = mk_wcwidth(wc);
+	if (w > 0) return w;
+    }
+    return 1;
+}
+#endif /* EXP_WCWIDTH_SUPPORT */
+
+/*
  * Free storage used for the link-highlighting.
  */
 void LYFreeHilites(int first, int last)
@@ -598,22 +637,7 @@ static BOOL show_whereis_targets(int flag,
 		    itmp += (int) utf_extra;
 #if defined(EXP_WCWIDTH_SUPPORT)
 		    /* Calculate UTF-8 character width for cursor positioning */
-		    {
-			unsigned char ch = (unsigned char)tmp[0];
-			wchar_t wc = 0;
-			if ((ch & 0xE0) == 0xC0) {
-			    wc = ((ch & 0x1F) << 6) | (tmp[1] & 0x3F);
-			} else if ((ch & 0xF0) == 0xE0) {
-			    wc = ((ch & 0x0F) << 12) | ((tmp[1] & 0x3F) << 6) | (tmp[2] & 0x3F);
-			} else if ((ch & 0xF8) == 0xF0) {
-			    wc = ((ch & 0x07) << 18) | ((tmp[1] & 0x3F) << 12) |
-				 ((tmp[2] & 0x3F) << 6) | (tmp[3] & 0x3F);
-			}
-			if (wc > 0) {
-			    int w = mk_wcwidth(wc);
-			    if (w > 0) char_width = w;
-			}
-		    }
+		    char_width = utf8_char_width(tmp);
 #endif
 		    /*
 		     * Start emphasis immediately if we are making the link
@@ -689,22 +713,7 @@ static BOOL show_whereis_targets(int flag,
 			itmp += (int) utf_extra;
 #if defined(EXP_WCWIDTH_SUPPORT)
 			/* Calculate UTF-8 character width for cursor positioning */
-			{
-			    unsigned char ch = (unsigned char)tmp[0];
-			    wchar_t wc = 0;
-			    if ((ch & 0xE0) == 0xC0) {
-				wc = ((ch & 0x1F) << 6) | (tmp[1] & 0x3F);
-			    } else if ((ch & 0xF0) == 0xE0) {
-				wc = ((ch & 0x0F) << 12) | ((tmp[1] & 0x3F) << 6) | (tmp[2] & 0x3F);
-			    } else if ((ch & 0xF8) == 0xF0) {
-				wc = ((ch & 0x07) << 18) | ((tmp[1] & 0x3F) << 12) |
-				     ((tmp[2] & 0x3F) << 6) | (tmp[3] & 0x3F);
-			    }
-			    if (wc > 0) {
-				int w = mk_wcwidth(wc);
-				if (w > 0) char_width = w;
-			    }
-			}
+			char_width = utf8_char_width(tmp);
 #endif
 			/*
 			 * Make sure we don't restore emphasis to the last
@@ -837,22 +846,7 @@ static BOOL show_whereis_targets(int flag,
 		    itmp += (int) utf_extra;
 #if defined(EXP_WCWIDTH_SUPPORT)
 		    /* Calculate UTF-8 character width for cursor positioning */
-		    {
-			unsigned char ch = (unsigned char)tmp[0];
-			wchar_t wc = 0;
-			if ((ch & 0xE0) == 0xC0) {
-			    wc = ((ch & 0x1F) << 6) | (tmp[1] & 0x3F);
-			} else if ((ch & 0xF0) == 0xE0) {
-			    wc = ((ch & 0x0F) << 12) | ((tmp[1] & 0x3F) << 6) | (tmp[2] & 0x3F);
-			}  else if ((ch & 0xF8) == 0xF0) {
-			    wc = ((ch & 0x07) << 18) | ((tmp[1] & 0x3F) << 12) |
-				 ((tmp[2] & 0x3F) << 6) | (tmp[3] & 0x3F);
-			}
-			if (wc > 0) {
-			    int w = mk_wcwidth(wc);
-			    if (w > 0) char_width = w;
-			}
-		    }
+		    char_width = utf8_char_width(tmp);
 #endif
 		    /*
 		     * Start emphasis immediately if we are making the link
@@ -931,22 +925,7 @@ static BOOL show_whereis_targets(int flag,
 			itmp += (int) utf_extra;
 #if defined(EXP_WCWIDTH_SUPPORT)
 			/* Calculate UTF-8 character width for cursor positioning */
-			{
-			    unsigned char ch = (unsigned char)tmp[0];
-			    wchar_t wc = 0;
-			    if ((ch & 0xE0) == 0xC0) {
-				wc = ((ch & 0x1F) << 6) | (tmp[1] & 0x3F);
-			    } else if ((ch & 0xF0) == 0xE0) {
-				wc = ((ch & 0x0F) << 12) | ((tmp[1] & 0x3F) << 6) | (tmp[2] & 0x3F);
-			    } else if ((ch & 0xF8) == 0xF0) {
-				wc = ((ch & 0x07) << 18) | ((tmp[1] & 0x3F) << 12) |
-				     ((tmp[2] & 0x3F) << 6) | (tmp[3] & 0x3F);
-			    }
-			    if (wc > 0) {
-				int w = mk_wcwidth(wc);
-				if (w > 0) char_width = w;
-			    }
-			}
+			char_width = utf8_char_width(tmp);
 #endif
 			/*
 			 * Make sure we don't restore emphasis to the last
@@ -1071,22 +1050,7 @@ static BOOL show_whereis_targets(int flag,
 				itmp += (int) utf_extra;
 #if defined(EXP_WCWIDTH_SUPPORT)
 				/* Calculate UTF-8 character width for cursor positioning */
-				{
-				    unsigned char ch = (unsigned char)tmp[0];
-				    wchar_t wc = 0;
-				    if ((ch & 0xE0) == 0xC0) {
-					wc = ((ch & 0x1F) << 6) | (tmp[1] & 0x3F);
-				    } else if ((ch & 0xF0) == 0xE0) {
-					wc = ((ch & 0x0F) << 12) | ((tmp[1] & 0x3F) << 6) | (tmp[2] & 0x3F);
-				    } else if ((ch & 0xF8) == 0xF0) {
-					wc = ((ch & 0x07) << 18) | ((tmp[1] & 0x3F) << 12) |
-					     ((tmp[2] & 0x3F) << 6) | (tmp[3] & 0x3F);
-				    }
-				    if (wc > 0) {
-					int w = mk_wcwidth(wc);
-					if (w > 0) char_width = w;
-				    }
-				}
+				char_width = utf8_char_width(tmp);
 #endif
 				/*
 				 * Make sure we don't restore emphasis to the
@@ -1367,30 +1331,11 @@ void LYhighlight(int flag,
 			size_t utf_extra = utf8_length(utf_flag, hi_string + i);
 			if (utf_extra > 0) {
 			    int j;
-			    wchar_t wc = 0;
-			    unsigned char ch = (unsigned char)tmp[0];
 			    int char_width = 1;
-
-			    /* Decode UTF-8 to get character width */
-			    if ((ch & 0xE0) == 0xC0 && utf_extra == 1) {
-				wc = ((ch & 0x1F) << 6) | (hi_string[i+1] & 0x3F);
-			    } else if ((ch & 0xF0) == 0xE0 && utf_extra == 2) {
-				wc = ((ch & 0x0F) << 12) |
-				     ((hi_string[i+1] & 0x3F) << 6) |
-				     (hi_string[i+2] & 0x3F);
-			    } else if ((ch & 0xF8) == 0xF0 && utf_extra == 3) {
-				wc = ((ch & 0x07) << 18) |
-				     ((hi_string[i+1] & 0x3F) << 12) |
-				     ((hi_string[i+2] & 0x3F) << 6) |
-				     (hi_string[i+3] & 0x3F);
-			    }
-
 #ifdef EXP_WCWIDTH_SUPPORT
-			    if (wc > 0) {
-				char_width = mk_wcwidth(wc);
-				if (char_width < 1) char_width = 1;
-			    }
+			    char_width = utf8_char_width(hi_string + i);
 #else
+			    wchar_t wc = decode_utf8_char(hi_string + i);
 			    /* Estimate: CJK range characters are typically 2 columns */
 			    if (wc >= 0x1100 &&
 				((wc <= 0x115F) ||  /* Hangul Jamo */

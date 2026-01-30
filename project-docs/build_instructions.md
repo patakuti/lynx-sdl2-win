@@ -91,6 +91,7 @@
     # configure_win64.shで自動的に以下が設定される:
     #   - --with-ssl でSSL有効化
     #   - LIBS に -lpdcurses -lSDL2 -lSDL2_ttf が追加
+    #   - USE_PROGRAM_DIR が有効化（設定ファイルをexeと同じディレクトリから読み込む）
     ```
 
   - 3. Lynxのビルド
@@ -103,11 +104,13 @@
     ```
 
 - 重要な設定ファイル
-  - lynx_cfg.h
+  - lynx_cfg.h（configureで自動生成）
     - `#define EXP_WCWIDTH_SUPPORT 1` を設定すること
+    - 注意: USE_PROGRAM_DIR はCPPFLAGSで設定するため、lynx_cfg.hの編集は不要
   - configure_win64.sh
     - SSL有効化: `--with-ssl="${OPENSSL_DIR}"`
     - LIBS に `-lpdcurses -lSDL2 -lSDL2_ttf` を設定
+    - USE_PROGRAM_DIR: Windows用にexeディレクトリから設定ファイルを読み込む
   - src/makefile (configure後)
     - OBJS に `wcwidth.o` を追加
 

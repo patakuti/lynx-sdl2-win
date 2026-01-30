@@ -57,6 +57,7 @@ extern int kbhit(void);		/* FIXME: use conio.h */
 #include <LYClean.h>
 #include <LYCharSets.h>
 #include <LYCharUtils.h>
+#include <wcwidth.h>		/* for mk_wcwidth - CJK width support */
 
 #include <LYMainLoop.h>
 #include <LYKeymap.h>
@@ -388,6 +389,45 @@ size_t utf8_length(int utf_flag,
 }
 
 /*
+ * Decode UTF-8 sequence to wchar_t.
+ * Returns 0 if not a valid UTF-8 multi-byte sequence.
+ */
+wchar_t decode_utf8_char(const char *s)
+{
+    unsigned char ch = (unsigned char)s[0];
+    wchar_t wc = 0;
+
+    if ((ch & 0xE0) == 0xC0) {
+	/* 2-byte sequence: 110xxxxx 10xxxxxx */
+	wc = ((ch & 0x1F) << 6) | (s[1] & 0x3F);
+    } else if ((ch & 0xF0) == 0xE0) {
+	/* 3-byte sequence: 1110xxxx 10xxxxxx 10xxxxxx */
+	wc = ((ch & 0x0F) << 12) | ((s[1] & 0x3F) << 6) | (s[2] & 0x3F);
+    } else if ((ch & 0xF8) == 0xF0) {
+	/* 4-byte sequence: 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx */
+	wc = ((ch & 0x07) << 18) | ((s[1] & 0x3F) << 12) |
+	     ((s[2] & 0x3F) << 6) | (s[3] & 0x3F);
+    }
+    return wc;
+}
+
+#if defined(EXP_WCWIDTH_SUPPORT)
+/*
+ * Get the cell width of a UTF-8 character.
+ * Returns 1 for ASCII or invalid sequences.
+ */
+int utf8_char_width(const char *s)
+{
+    wchar_t wc = decode_utf8_char(s);
+    if (wc > 0) {
+	int w = mk_wcwidth(wc);
+	if (w > 0) return w;
+    }
+    return 1;
+}
+#endif /* EXP_WCWIDTH_SUPPORT */
+
+/*
  * Free storage used for the link-highlighting.
  */
 void LYFreeHilites(int first, int last)
@@ -477,7 +517,7 @@ int LYGetHilitePos(int cur,
 
 #define SKIP_GLYPHS(theFlag, theData, theOffset) \
 	(theFlag \
-	    ? LYmbcs_skip_glyphs(theData, (theOffset), theFlag) \
+	    ? LYmbcs_skip_cells(theData, (theOffset), theFlag) \
 	    : (theData + (theOffset)))
 
 /*
@@ -592,8 +632,13 @@ static BOOL show_whereis_targets(int flag,
 		tmp[0] = data[itmp];
 		utf_extra = utf8_length(utf_flag, data + itmp);
 		if (utf_extra) {
+		    int char_width = 1;
 		    LYStrNCpy(&tmp[1], &data[itmp + 1], utf_extra);
 		    itmp += (int) utf_extra;
+#if defined(EXP_WCWIDTH_SUPPORT)
+		    /* Calculate UTF-8 character width for cursor positioning */
+		    char_width = utf8_char_width(tmp);
+#endif
 		    /*
 		     * Start emphasis immediately if we are making the link
 		     * non-current.  -FM
@@ -603,7 +648,7 @@ static BOOL show_whereis_targets(int flag,
 			TargetEmphasisON = TRUE;
 			LYaddstr(tmp);
 		    } else {
-			LYmove(hLine, (offset + 1));
+			LYmove(hLine, (offset + char_width));
 		    }
 		    tmp[1] = '\0';
 		    written += (int) (utf_extra + 1);
@@ -621,7 +666,7 @@ static BOOL show_whereis_targets(int flag,
 			TargetEmphasisON = TRUE;
 			LYaddstr(tmp);
 		    } else {
-			LYmove(hLine, (offset + 1));
+			LYmove(hLine, (offset + 2));  /* CJK character is 2 cells wide */
 		    }
 		    tmp[1] = '\0';
 		    written += 2;
@@ -635,7 +680,7 @@ static BOOL show_whereis_targets(int flag,
 			TargetEmphasisON = TRUE;
 			LYaddstr(tmp);
 		    } else {
-			LYmove(hLine, (offset + 1));
+			LYmove(hLine, (offset + 1));  /* ASCII character is 1 cell wide */
 		    }
 		    written++;
 		}
@@ -663,8 +708,13 @@ static BOOL show_whereis_targets(int flag,
 		     */
 		    utf_extra = utf8_length(utf_flag, data + itmp);
 		    if (utf_extra) {
+			int char_width = 1;
 			LYStrNCpy(&tmp[1], &data[itmp + 1], utf_extra);
 			itmp += (int) utf_extra;
+#if defined(EXP_WCWIDTH_SUPPORT)
+			/* Calculate UTF-8 character width for cursor positioning */
+			char_width = utf8_char_width(tmp);
+#endif
 			/*
 			 * Make sure we don't restore emphasis to the last
 			 * character of hightext if we are making the link
@@ -675,7 +725,7 @@ static BOOL show_whereis_targets(int flag,
 			    TargetEmphasisON = FALSE;
 			    LYGetYX(y, offset);
 			    (void) y;
-			    LYmove(hLine, (offset + 1));
+			    LYmove(hLine, (offset + char_width));
 			} else {
 			    LYaddstr(tmp);
 			}
@@ -695,7 +745,7 @@ static BOOL show_whereis_targets(int flag,
 			    LYstopTargetEmphasis();
 			    TargetEmphasisON = FALSE;
 			    LYGetYX(y, offset);
-			    LYmove(hLine, (offset + 1));
+			    LYmove(hLine, (offset + 2));  /* CJK character is 2 cells wide */
 			} else {
 			    LYaddstr(tmp);
 			}
@@ -711,7 +761,7 @@ static BOOL show_whereis_targets(int flag,
 			    LYstopTargetEmphasis();
 			    TargetEmphasisON = FALSE;
 			    LYGetYX(y, offset);
-			    LYmove(hLine, (offset + 1));
+			    LYmove(hLine, (offset + 1));  /* ASCII character is 1 cell wide */
 			} else {
 			    LYaddstr(tmp);
 			}
@@ -773,7 +823,8 @@ static BOOL show_whereis_targets(int flag,
 	     * restoring the emphasis.  -FM
 	     */
 	    if ((Offset - offset) <= (flag == TRUE ? (hLen - 1) : hLen)) {
-		data = SKIP_GLYPHS(utf_flag, data, Offset - offset);
+		int skip_cells = Offset - offset;
+		data = SKIP_GLYPHS(utf_flag, data, skip_cells);
 		if (utf_flag) {
 		    LYrefresh();
 		}
@@ -790,8 +841,13 @@ static BOOL show_whereis_targets(int flag,
 		tmp[0] = data[itmp];
 		utf_extra = utf8_length(utf_flag, data + itmp);
 		if (utf_extra) {
+		    int char_width = 1;
 		    LYStrNCpy(&tmp[1], &data[itmp + 1], utf_extra);
 		    itmp += (int) utf_extra;
+#if defined(EXP_WCWIDTH_SUPPORT)
+		    /* Calculate UTF-8 character width for cursor positioning */
+		    char_width = utf8_char_width(tmp);
+#endif
 		    /*
 		     * Start emphasis immediately if we are making the link
 		     * non-current, or we are making it current but this is not
@@ -803,7 +859,7 @@ static BOOL show_whereis_targets(int flag,
 			TargetEmphasisON = TRUE;
 			LYaddstr(tmp);
 		    } else {
-			LYmove(hLine, (offset + 1));
+			LYmove(hLine, (offset + char_width));
 		    }
 		    tmp[1] = '\0';
 		    written += (int) (utf_extra + 1);
@@ -864,8 +920,13 @@ static BOOL show_whereis_targets(int flag,
 		     */
 		    utf_extra = utf8_length(utf_flag, data + itmp);
 		    if (utf_extra) {
+			int char_width = 1;
 			LYStrNCpy(&tmp[1], &data[itmp + 1], utf_extra);
 			itmp += (int) utf_extra;
+#if defined(EXP_WCWIDTH_SUPPORT)
+			/* Calculate UTF-8 character width for cursor positioning */
+			char_width = utf8_char_width(tmp);
+#endif
 			/*
 			 * Make sure we don't restore emphasis to the last
 			 * character of hightext if we are making the link
@@ -875,7 +936,7 @@ static BOOL show_whereis_targets(int flag,
 			    LYstopTargetEmphasis();
 			    TargetEmphasisON = FALSE;
 			    LYGetYX(y, offset);
-			    LYmove(hLine, (offset + 1));
+			    LYmove(hLine, (offset + char_width));
 			} else {
 			    LYaddstr(tmp);
 			}
@@ -895,7 +956,7 @@ static BOOL show_whereis_targets(int flag,
 			    LYstopTargetEmphasis();
 			    TargetEmphasisON = FALSE;
 			    LYGetYX(y, offset);
-			    LYmove(hLine, (offset + 1));
+			    LYmove(hLine, (offset + 2));  /* CJK character is 2 cells wide */
 			} else {
 			    LYaddstr(tmp);
 			}
@@ -911,7 +972,7 @@ static BOOL show_whereis_targets(int flag,
 			    LYstopTargetEmphasis();
 			    TargetEmphasisON = FALSE;
 			    LYGetYX(y, offset);
-			    LYmove(hLine, (offset + 1));
+			    LYmove(hLine, (offset + 1));  /* ASCII character is 1 cell wide */
 			} else {
 			    LYaddstr(tmp);
 			}
@@ -984,8 +1045,13 @@ static BOOL show_whereis_targets(int flag,
 			     */
 			    utf_extra = utf8_length(utf_flag, data + itmp);
 			    if (utf_extra) {
+				int char_width = 1;
 				LYStrNCpy(&tmp[1], &data[itmp + 1], utf_extra);
 				itmp += (int) utf_extra;
+#if defined(EXP_WCWIDTH_SUPPORT)
+				/* Calculate UTF-8 character width for cursor positioning */
+				char_width = utf8_char_width(tmp);
+#endif
 				/*
 				 * Make sure we don't restore emphasis to the
 				 * last character of hightext if we are making
@@ -995,7 +1061,7 @@ static BOOL show_whereis_targets(int flag,
 				    LYstopTargetEmphasis();
 				    TargetEmphasisON = FALSE;
 				    LYGetYX(y, offset);
-				    LYmove(hLine, (offset + 1));
+				    LYmove(hLine, (offset + char_width));
 				} else {
 				    LYaddstr(tmp);
 				}
@@ -1230,10 +1296,12 @@ void LYhighlight(int flag,
 	     && LYP + hi_count <= display_lines;
 	     ++hi_count) {
 	    int row = LYP + hi_count + title_adjust;
+	    int col = 0;  /* screen column position */
 
 	    hi_offset = LYGetHilitePos(cur, hi_count);
 	    if (hi_offset < 0)
 		continue;
+
 	    lynx_stop_link_color(flag == TRUE, links[cur].inUnderline);
 	    LYmove(row, hi_offset);
 
@@ -1248,7 +1316,7 @@ void LYhighlight(int flag,
 #endif
 
 	    for (i = 0; (tmp[0] = hi_string[i]) != '\0'
-		 && (i + hi_offset) < LYcols; i++) {
+		 && (col + hi_offset) < LYcols; i++) {
 		if (!IsSpecialAttrChar(hi_string[i])) {
 		    /*
 		     * For CJK strings, by Masanobu Kimura.
@@ -1257,8 +1325,48 @@ void LYhighlight(int flag,
 			tmp[1] = hi_string[++i];
 			LYaddstr(tmp);
 			tmp[1] = '\0';
+			col += 2;  /* CJK characters are 2 columns wide */
+		    } else if (utf_flag && is8bits(tmp[0])) {
+			/* UTF-8 multibyte character */
+			size_t utf_extra = utf8_length(utf_flag, hi_string + i);
+			if (utf_extra > 0) {
+			    int j;
+			    int char_width = 1;
+#ifdef EXP_WCWIDTH_SUPPORT
+			    char_width = utf8_char_width(hi_string + i);
+#else
+			    wchar_t wc = decode_utf8_char(hi_string + i);
+			    /* Estimate: CJK range characters are typically 2 columns */
+			    if (wc >= 0x1100 &&
+				((wc <= 0x115F) ||  /* Hangul Jamo */
+				 (wc >= 0x2E80 && wc <= 0x9FFF) ||  /* CJK */
+				 (wc >= 0xAC00 && wc <= 0xD7A3) ||  /* Hangul */
+				 (wc >= 0xF900 && wc <= 0xFAFF) ||  /* CJK Compatibility */
+				 (wc >= 0xFE10 && wc <= 0xFE1F) ||  /* Vertical forms */
+				 (wc >= 0xFE30 && wc <= 0xFE6F) ||  /* CJK Compatibility */
+				 (wc >= 0xFF00 && wc <= 0xFF60) ||  /* Fullwidth */
+				 (wc >= 0xFFE0 && wc <= 0xFFE6))) { /* Fullwidth */
+				char_width = 2;
+			    }
+#endif
+
+			    /* Copy the full UTF-8 sequence */
+			    for (j = 0; j <= (int)utf_extra && j < 6; j++) {
+				tmp[j] = hi_string[i + j];
+			    }
+			    tmp[j] = '\0';
+			    LYaddstr(tmp);
+			    tmp[1] = '\0';
+
+			    i += (int)utf_extra;  /* skip extra bytes (loop will add 1 more) */
+			    col += char_width;
+			} else {
+			    LYaddstr(tmp);
+			    col++;
+			}
 		    } else {
 			LYaddstr(tmp);
+			col++;
 		    }
 		}
 	    }
@@ -2863,6 +2971,7 @@ char *LYFindConfigFile(const char *nominal, const char *dftfile)
 	    FREE(list);
 
 	    if (!found) {
+		FREE(result);  /* Clear result from failed LYNX_CFG_PATH search */
 		/*
 		 * If not found, try finding it in the same directory as the
 		 * compiled-in location of the default file.
@@ -2880,14 +2989,14 @@ char *LYFindConfigFile(const char *nominal, const char *dftfile)
 		    }
 		}
 #ifdef USE_PROGRAM_DIR
-		else {
-		    /*
-		     * Finally, try in the same directory as the executable.
-		     */
+		/*
+		 * Try in the same directory as the executable.
+		 */
+		if (result == 0) {
+		    const char *leafname = LYPathLeaf(nominal);
 		    StrAllocCopy(result, program_dir);
 		    LYAddPathSep(&result);
-		    StrAllocCat(result, nominal);
-		    LYTildeExpand(&result, TRUE);
+		    StrAllocCat(result, leafname);
 		    if (!LYCanReadFile(result)) {
 			FREE(result);
 		    }

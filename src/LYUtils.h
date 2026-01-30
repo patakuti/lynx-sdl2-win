@@ -173,6 +173,10 @@ extern "C" {
     extern int find_restriction(const char *name, int len);
     extern int number2arrows(int number);
     extern size_t utf8_length(int utf_flag, const char *data);
+    extern wchar_t decode_utf8_char(const char *s);
+#if defined(EXP_WCWIDTH_SUPPORT)
+    extern int utf8_char_width(const char *s);
+#endif
     extern time_t LYmktime(char *string, int absolute);
     extern void BeginInternalPage(FILE *fp0, const char *Title, const char *HelpURL);
     extern void EndInternalPage(FILE *fp0);

@@ -1387,6 +1387,8 @@ int main(int argc,
     for (i = 1; i < argc; i++) {
 	parse_arg(&argv[i], 2, &i);
     }
+    CTRACE((tfp, "LYMain: PARSE_SECOND completed\n"));
+    fflush(tfp);
 
     /*
      * If we have a lone "-" switch for getting arguments from stdin, get them
@@ -1438,6 +1440,8 @@ int main(int argc,
 	CTRACE((tfp, "...done with stdin arguments\n"));
 	FREE(buf);
     }
+    CTRACE((tfp, "LYMain: checkpoint A\n"));
+    fflush(tfp);
 #ifdef SOCKS
     if (socks_flag)
 	SOCKSinit(argv[0]);
@@ -1451,6 +1455,8 @@ int main(int argc,
 	parse_restrictions("all");
 	LYUseTraceLog = FALSE;
     }
+    CTRACE((tfp, "LYMain: checkpoint B\n"));
+    fflush(tfp);
 
     /*
      * If we didn't get and act on a -validate or -anonymous switch, but can
@@ -1533,6 +1539,8 @@ int main(int argc,
      */
     if (isEmpty(lynx_cfg_file))
 	StrAllocCopy(lynx_cfg_file, LYNX_CFG_FILE);
+    CTRACE((tfp, "LYMain: checkpoint C, lynx_cfg_file=%s\n", lynx_cfg_file ? lynx_cfg_file : "(null)"));
+    fflush(tfp);
 
 #ifndef _WINDOWS		/* avoid the whole ~ thing for now */
     LYTildeExpand(&lynx_cfg_file, FALSE);
@@ -1616,7 +1624,11 @@ int main(int argc,
     /*
      * Process the configuration file.
      */
+    CTRACE((tfp, "LYMain: checkpoint D, before read_cfg\n"));
+    fflush(tfp);
     read_cfg(lynx_cfg_file, "main program", 1, (FILE *) 0);
+    CTRACE((tfp, "LYMain: checkpoint E, after read_cfg\n"));
+    fflush(tfp);
 
     {
 	static char *client_keyfile = NULL;
@@ -2089,13 +2101,17 @@ int main(int argc,
 #endif
 #endif
 
+    CTRACE((tfp, "LYMain: before setup(), dump_output_immediately=%d\n", dump_output_immediately));
     if (!dump_output_immediately) {
+	CTRACE((tfp, "LYMain: calling setup()\n"));
 	setup(terminal);
+	CTRACE((tfp, "LYMain: setup() returned\n"));
     }
     /*
      * If startfile is a file URL and the host is defaulted, force in
      * "//localhost", and if it's not an absolute URL, make it one.  - FM
      */
+    CTRACE((tfp, "LYMain: calling LYEnsureAbsoluteURL\n"));
     LYEnsureAbsoluteURL(&startfile, "STARTFILE", FALSE);
 
     /*

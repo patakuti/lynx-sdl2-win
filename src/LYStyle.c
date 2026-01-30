@@ -928,20 +928,26 @@ void init_color_styles(char **from_cmdline, const char *default_styles)
 	lynx_lss_file = find_lss_file(cp = user_lss_file);
 	*from_cmdline = 0;
     } else {
+	CTRACE((tfp, "init_color_styles: using default LYNX_LSS_FILE=%s\n", LYNX_LSS_FILE));
 	lynx_lss_file = find_lss_file(cp = DeConst(LYNX_LSS_FILE));
     }
-    CTRACE1((tfp, "init_color_styles(%s)\n", NonNull(lynx_lss_file)));
+    CTRACE((tfp, "init_color_styles: lynx_lss_file=%s\n", NonNull(lynx_lss_file)));
 
-    if (isEmpty(lynx_lss_file))
+    if (isEmpty(lynx_lss_file)) {
+	CTRACE((tfp, "init_color_styles: lynx_lss_file is empty, returning\n"));
 	return;
+    }
     /*
      * If the lynx-style file is not available, inform the user and exit.
      */
+    CTRACE((tfp, "init_color_styles: checking if can read %s\n", lynx_lss_file));
     if (!LYCanReadFile(lynx_lss_file)) {
+	CTRACE((tfp, "init_color_styles: cannot read file, exiting\n"));
 	fprintf(stderr, gettext("\nLynx file \"%s\" is not available.\n\n"),
 		NonNull(cp));
 	exit_immediately(EXIT_FAILURE);
     }
+    CTRACE((tfp, "init_color_styles: file is readable\n"));
 
     /*
      * Otherwise, load the initial lss-file and add it to the list for the

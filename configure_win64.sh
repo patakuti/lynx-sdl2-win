@@ -15,6 +15,6 @@ WIN64_BUILD=/home/patakuti/CCROOT/lynx-sdl2/win64-build
   --with-ssl="${OPENSSL_DIR}" \
   --without-x \
   --disable-nls \
-  CPPFLAGS="-I${PDCURSES_DIR} -I${SDL2_DIR}/include/SDL2 -I${SDL2_TTF_DIR}/include/SDL2 -I${OPENSSL_DIR}/include -DPDCURSES -DPDCURSES_SDL2 -DPDC_WIDE -DPDC_FORCE_UTF8" \
+  CPPFLAGS="-I${PDCURSES_DIR} -I${SDL2_DIR}/include/SDL2 -I${SDL2_TTF_DIR}/include/SDL2 -I${OPENSSL_DIR}/include -DPDCURSES -DPDCURSES_SDL2 -DPDC_WIDE -DPDC_FORCE_UTF8 -DUSE_PROGRAM_DIR" \
   LDFLAGS="-L${WIN64_BUILD} -L${SDL2_DIR}/lib -L${SDL2_TTF_DIR}/lib -L${OPENSSL_DIR}/lib -mwindows" \
   LIBS="-lpdcurses -lSDL2 -lSDL2_ttf"

@@ -1656,6 +1656,15 @@ static int display_line(HTLine *line,
 		LYaddstr(buffer);
 		buffer[1] = '\0';
 		data += utf_extra;
+#if defined(PDCURSES) && defined(PDC_WIDE) && defined(EXP_WCWIDTH_SUPPORT)
+		/* For wide UTF-8 characters (like CJK), increment i for the extra width */
+		{
+		    int w = utf8_char_width(buffer);
+		    if (w > 1) {
+			i += (w - 1);  /* Already incremented by 1 at end of switch, add rest */
+		    }
+		}
+#endif
 		utf_extra = 0;
 	    } else if (is_CJK2(buffer[0])) {
 		/*
@@ -2284,7 +2293,7 @@ static void display_page(HText *text,
 			 */
 			utf_extra = utf8_length(text->T.output_utf8, data + itmp);
 			if (utf_extra) {
-			    LYStrNCpy(&tmp[1], &line->data[itmp + 1], utf_extra);
+			    LYStrNCpy(&tmp[1], &data[itmp + 1], utf_extra);
 			    itmp += utf_extra;
 			    LYaddstr(tmp);
 			    tmp[1] = '\0';
@@ -6225,49 +6234,15 @@ static void HText_trimHightext(HText *text,
 		char *hi_string = NULL;
 		int hi_offset = line_ptr2->offset;
 
-#if defined(PDCURSES) && defined(PDC_WIDE) && defined(EXP_WCWIDTH_SUPPORT)
-		/* Convert byte/character offset to cell offset for CJK characters */
-		if (line_ptr2->data && hi_offset > 0) {
-		    int cell_offset = 0;
-		    const char *p = line_ptr2->data;
-		    const char *end = p + hi_offset;
-
-		    while (p < end && *p) {
-			if (is8bits(*p)) {
-			    unsigned char ch = (unsigned char)*p;
-			    wchar_t wc = 0;
-			    int bytes = 0;
-
-			    if ((ch & 0xE0) == 0xC0 && p + 1 < end) {
-				wc = ((ch & 0x1F) << 6) | (p[1] & 0x3F);
-				bytes = 2;
-			    } else if ((ch & 0xF0) == 0xE0 && p + 2 < end) {
-				wc = ((ch & 0x0F) << 12) | ((p[1] & 0x3F) << 6) | (p[2] & 0x3F);
-				bytes = 3;
-			    } else if ((ch & 0xF8) == 0xF0 && p + 3 < end) {
-				wc = ((ch & 0x07) << 18) | ((p[1] & 0x3F) << 12) |
-				     ((p[2] & 0x3F) << 6) | (p[3] & 0x3F);
-				bytes = 4;
-			    } else {
-				bytes = 1;
-			    }
-
-			    if (bytes > 1 && wc > 0) {
-				int w = mk_wcwidth(wc);
-				cell_offset += (w > 0) ? w : 1;
-				p += bytes;
-			    } else {
-				cell_offset++;
-				p++;
-			    }
-			} else {
-			    cell_offset++;
-			    p++;
-			}
-		    }
-		    hi_offset = cell_offset;
-		}
-#endif
+		/*
+		 * Note: line_ptr2->offset is already in cell units (column position),
+		 * not byte units. No conversion is needed here.
+		 * The previous code incorrectly tried to convert it by iterating
+		 * through line_ptr2->data, which caused misaligned highlighting
+		 * for CJK multi-line links.
+		 */
+		CTRACE((tfp, "LYAddHiText: line_ptr2->offset=%d (cell position)\n",
+			line_ptr2->offset));
 
 		StrnAllocCopy(hi_string,
 			      line_ptr2->data,
@@ -7150,29 +7125,6 @@ BOOL HText_getFirstTargetInLine(HText *text, int line_num,
 	 */
 	*offset = (LineOffset + HitOffset);
 	*tLen = (LenNeeded - HitOffset);
-
-	CTRACE((tfp, "WHEREIS_DEBUG: HText_getFirstTargetInLine line_num=%d\n", line_num));
-	CTRACE((tfp, "WHEREIS_DEBUG:   LineOffset=%d HitOffset=%d LenNeeded=%d\n",
-		LineOffset, HitOffset, LenNeeded));
-	CTRACE((tfp, "WHEREIS_DEBUG:   *offset=%d *tLen=%d utf_flag=%d count_gcells=YES\n",
-		*offset, *tLen, utf_flag));
-	CTRACE((tfp, "WHEREIS_DEBUG:   cp byte offset from LineData: %d\n",
-		(int)(cp - LineData)));
-	{
-	    int i;
-	    CTRACE((tfp, "WHEREIS_DEBUG:   LineData hex: "));
-	    for (i = 0; i < 40 && LineData[i]; i++) {
-		CTRACE((tfp, "%02X ", (unsigned char)LineData[i]));
-	    }
-	    CTRACE((tfp, "\n"));
-	    CTRACE((tfp, "WHEREIS_DEBUG:   LineData str: '%s'\n", LineData));
-	    CTRACE((tfp, "WHEREIS_DEBUG:   cp (returned by LYno_attr_mb_strstr): '%s'\n", cp));
-	    CTRACE((tfp, "WHEREIS_DEBUG:   cp hex: "));
-	    for (i = 0; i < 20 && cp[i]; i++) {
-		CTRACE((tfp, "%02X ", (unsigned char)cp[i]));
-	    }
-	    CTRACE((tfp, "\n"));
-	}
 
 	StrAllocCopy(*data, cp);
 	remove_special_attr_chars(*data);
@@ -14335,18 +14287,6 @@ static void move_to_glyph(int YP,
 			  int flags,
 			  int utf_flag)
 {
-    /* DEBUG: Show MessageBox on first call to verify function is called */
-    static int first_call = 1;
-    if (first_call) {
-	first_call = 0;
-#ifdef _WINDOWS
-	char msg[256];
-	sprintf(msg, "move_to_glyph called!\nYP=%d XP=%d\ntarget=%s",
-		YP, XP, target ? target : "(null)");
-	MessageBoxA(NULL, msg, "DEBUG: move_to_glyph", MB_OK);
-#endif
-    }
-
     char buffer[7];
     const char *end_of_data;
     size_t utf_extra = 0;
@@ -14426,25 +14366,6 @@ static void move_to_glyph(int YP,
 	    } else {
 		i_start_tgt = i + HitOffset;
 		i_after_tgt = i + LenNeeded;
-#if defined(PDCURSES) && defined(PDC_WIDE) && defined(EXP_WCWIDTH_SUPPORT)
-		/* DEBUG: Log search highlight position calculation */
-		{
-		    FILE *fp = fopen("lynx_debug.log", "a");
-		    fprintf(stderr, "=== WHEREIS TARGET FOUND ===\n");
-		    fprintf(stderr, "target='%s' sdata='%.50s'\n", target, sdata);
-		    fprintf(stderr, "i=%d HitOffset=%d LenNeeded=%d\n", i, HitOffset, LenNeeded);
-		    fprintf(stderr, "i_start_tgt=%d i_after_tgt=%d\n", i_start_tgt, i_after_tgt);
-		    fprintf(stderr, "offset=%u XP=%d linkvlen=%d last_i=%d\n", offset, XP, linkvlen, last_i);
-		    if (fp) {
-			fprintf(fp, "=== WHEREIS TARGET FOUND ===\n");
-			fprintf(fp, "target='%s' sdata='%.50s'\n", target, sdata);
-			fprintf(fp, "i=%d HitOffset=%d LenNeeded=%d\n", i, HitOffset, LenNeeded);
-			fprintf(fp, "i_start_tgt=%d i_after_tgt=%d\n", i_start_tgt, i_after_tgt);
-			fprintf(fp, "offset=%u XP=%d linkvlen=%d last_i=%d\n", offset, XP, linkvlen, last_i);
-			fclose(fp);
-		    }
-		}
-#endif
 	    }
 	}
     } else {
@@ -14764,7 +14685,6 @@ static void move_to_glyph(int YP,
 		if (utf_extra > 0 && data - 1 < end_of_data) {
 		    wchar_t wc = 0;
 		    unsigned char ch = (unsigned char)buffer[0];
-		    int old_i = i;
 
 		    if ((ch & 0xE0) == 0xC0 && utf_extra == 1 && data < end_of_data) {
 			/* 2-byte UTF-8 */
@@ -14786,17 +14706,6 @@ static void move_to_glyph(int YP,
 			int w = mk_wcwidth(wc);
 			if (w > 1) {
 			    i += (w - 1);  /* Already incremented by 1, add the rest */
-			    /* DEBUG: Log when i is adjusted for CJK width */
-			    {
-				FILE *fp = fopen("lynx_debug.log", "a");
-				fprintf(stderr, "CJK char detected: U+%04X width=%d old_i=%d new_i=%d\n",
-					(unsigned)wc, w, old_i, i);
-				if (fp) {
-				    fprintf(fp, "CJK char detected: U+%04X width=%d old_i=%d new_i=%d\n",
-					    (unsigned)wc, w, old_i, i);
-				    fclose(fp);
-				}
-			    }
 			}
 		    }
 		}

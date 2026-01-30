@@ -1659,21 +1659,9 @@ static int display_line(HTLine *line,
 #if defined(PDCURSES) && defined(PDC_WIDE) && defined(EXP_WCWIDTH_SUPPORT)
 		/* For wide UTF-8 characters (like CJK), increment i for the extra width */
 		{
-		    unsigned char ch = (unsigned char)buffer[0];
-		    wchar_t wc = 0;
-		    if ((ch & 0xE0) == 0xC0) {
-			wc = ((ch & 0x1F) << 6) | (buffer[1] & 0x3F);
-		    } else if ((ch & 0xF0) == 0xE0) {
-			wc = ((ch & 0x0F) << 12) | ((buffer[1] & 0x3F) << 6) | (buffer[2] & 0x3F);
-		    } else if ((ch & 0xF8) == 0xF0) {
-			wc = ((ch & 0x07) << 18) | ((buffer[1] & 0x3F) << 12) |
-			     ((buffer[2] & 0x3F) << 6) | (buffer[3] & 0x3F);
-		    }
-		    if (wc > 0) {
-			int w = mk_wcwidth(wc);
-			if (w > 1) {
-			    i += (w - 1);  /* Already incremented by 1 at end of switch, add rest */
-			}
+		    int w = utf8_char_width(buffer);
+		    if (w > 1) {
+			i += (w - 1);  /* Already incremented by 1 at end of switch, add rest */
 		    }
 		}
 #endif

@@ -49,3 +49,22 @@ project-test/test_wcwidth
 config.status
 config.cache
 conf*.file
+
+# Generated makefiles
+makefile
+src/makefile
+src/chrtrans/makefile
+WWW/Library/Implementation/makefile
+
+# Generated header files
+LYHelp.h
+cfg_defs.h
+src/chrtrans/*_uni.h
+src/chrtrans/*_suni.h
+
+# Generated build tools
+src/chrtrans/makeuctb
+help_files.sed
+
+# Trace/debug logs
+win64-dist/LY-TRACE.LOG

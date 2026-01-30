@@ -5782,9 +5782,37 @@ const char *LYno_attr_mbcs_case_strstr(const char *haystack,
 		 IsNormalChar(*(haystack + 1))) ||
 		(0 == UPPER8(*haystack, *needle))) {
 		int tarlen = 0;
+		int first_char_width = 1;
 
 		offset = len;
-		len++;
+
+#if defined(PDCURSES) && defined(PDC_WIDE) && defined(EXP_WCWIDTH_SUPPORT)
+		/*
+		 * Calculate width of the first matching character for UTF-8.
+		 */
+		if (utf_flag && count_gcells && is8bits(*haystack)) {
+		    unsigned char ch = (unsigned char)*haystack;
+		    if ((ch & 0xE0) == 0xC0) {
+			wchar_t wc = ((ch & 0x1F) << 6) | (haystack[1] & 0x3F);
+			int w = mk_wcwidth(wc);
+			first_char_width = (w > 0) ? w : 1;
+		    } else if ((ch & 0xF0) == 0xE0) {
+			wchar_t wc = ((ch & 0x0F) << 12) |
+				     ((haystack[1] & 0x3F) << 6) |
+				     (haystack[2] & 0x3F);
+			int w = mk_wcwidth(wc);
+			first_char_width = (w > 0) ? w : 1;
+		    } else if ((ch & 0xF8) == 0xF0) {
+			wchar_t wc = ((ch & 0x07) << 18) |
+				     ((haystack[1] & 0x3F) << 12) |
+				     ((haystack[2] & 0x3F) << 6) |
+				     (haystack[3] & 0x3F);
+			int w = mk_wcwidth(wc);
+			first_char_width = (w > 0) ? w : 1;
+		    }
+		}
+#endif
+		len += first_char_width;
 
 		refptr = (haystack + 1);
 		tstptr = (needle + 1);
@@ -5891,11 +5919,6 @@ const char *LYno_attr_mbcs_case_strstr(const char *haystack,
 			if (nendp)
 			    *nendp = len + tarlen;
 			result = haystack;
-			CTRACE((tfp, "WHEREIS_DEBUG: LYno_attr_mbcs_strstr found match\n"));
-			CTRACE((tfp, "WHEREIS_DEBUG:   offset=%d (nstartp) len+tarlen=%d (nendp)\n",
-				offset, len + tarlen));
-			CTRACE((tfp, "WHEREIS_DEBUG:   utf_flag=%d count_gcells=%d\n",
-				utf_flag, count_gcells));
 			break;
 		    }
 		    if (*refptr == '\0')
@@ -5994,9 +6017,37 @@ const char *LYno_attr_mbcs_strstr(const char *haystack,
 	for (; *haystack != '\0' && (result == NULL); haystack++) {
 	    if ((*haystack) == (*needle)) {
 		int tarlen = 0;
+		int first_char_width = 1;
 
 		offset = len;
-		len++;
+
+#if defined(PDCURSES) && defined(PDC_WIDE) && defined(EXP_WCWIDTH_SUPPORT)
+		/*
+		 * Calculate width of the first matching character for UTF-8.
+		 */
+		if (utf_flag && count_gcells && is8bits(*haystack)) {
+		    unsigned char ch = (unsigned char)*haystack;
+		    if ((ch & 0xE0) == 0xC0) {
+			wchar_t wc = ((ch & 0x1F) << 6) | (haystack[1] & 0x3F);
+			int w = mk_wcwidth(wc);
+			first_char_width = (w > 0) ? w : 1;
+		    } else if ((ch & 0xF0) == 0xE0) {
+			wchar_t wc = ((ch & 0x0F) << 12) |
+				     ((haystack[1] & 0x3F) << 6) |
+				     (haystack[2] & 0x3F);
+			int w = mk_wcwidth(wc);
+			first_char_width = (w > 0) ? w : 1;
+		    } else if ((ch & 0xF8) == 0xF0) {
+			wchar_t wc = ((ch & 0x07) << 18) |
+				     ((haystack[1] & 0x3F) << 12) |
+				     ((haystack[2] & 0x3F) << 6) |
+				     (haystack[3] & 0x3F);
+			int w = mk_wcwidth(wc);
+			first_char_width = (w > 0) ? w : 1;
+		    }
+		}
+#endif
+		len += first_char_width;
 
 		refptr = (haystack + 1);
 		tstptr = (needle + 1);
@@ -6103,11 +6154,6 @@ const char *LYno_attr_mbcs_strstr(const char *haystack,
 			if (nendp)
 			    *nendp = len + tarlen;
 			result = haystack;
-			CTRACE((tfp, "WHEREIS_DEBUG: LYno_attr_mbcs_strstr found match\n"));
-			CTRACE((tfp, "WHEREIS_DEBUG:   offset=%d (nstartp) len+tarlen=%d (nendp)\n",
-				offset, len + tarlen));
-			CTRACE((tfp, "WHEREIS_DEBUG:   utf_flag=%d count_gcells=%d\n",
-				utf_flag, count_gcells));
 			break;
 		    }
 		    if (*refptr == '\0')

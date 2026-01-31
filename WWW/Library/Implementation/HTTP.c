@@ -228,7 +228,7 @@ SSL *HTGetSSLHandle(void)
 	if (ssl_ctx != NULL) {
 	    X509_LOOKUP *lookup;
 
-	    lookup = X509_STORE_add_lookup(ssl_ctx->cert_store,
+	    lookup = X509_STORE_add_lookup(SSL_CTX_get_cert_store(ssl_ctx),
 					   X509_LOOKUP_file());
 	    if (lookup != NULL) {
 		char *certfile = NULL;

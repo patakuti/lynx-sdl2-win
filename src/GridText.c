@@ -1653,11 +1653,9 @@ static int display_line(HTLine *line,
 	    }
 	    if (utf_extra) {
 		LYStrNCpy(&buffer[1], data, utf_extra);
-		LYaddstr(buffer);
-		buffer[1] = '\0';
-		data += utf_extra;
 #if defined(PDCURSES) && defined(PDC_WIDE) && defined(EXP_WCWIDTH_SUPPORT)
 		/* For wide UTF-8 characters (like CJK), increment i for the extra width */
+		/* Note: must call utf8_char_width BEFORE clearing buffer[1] */
 		{
 		    int w = utf8_char_width(buffer);
 		    if (w > 1) {
@@ -1665,6 +1663,9 @@ static int display_line(HTLine *line,
 		    }
 		}
 #endif
+		LYaddstr(buffer);
+		buffer[1] = '\0';
+		data += utf_extra;
 		utf_extra = 0;
 	    } else if (is_CJK2(buffer[0])) {
 		/*
@@ -4722,7 +4723,11 @@ void _internal_HTC(HText *text, int style, int dir)
 	    if ((int) line->styles[line->numstyles].sc_horizpos >= ctrl_chars_on_this_line) {
 		line->styles[line->numstyles].sc_horizpos =
 		    CAST_POS(line->styles[line->numstyles].sc_horizpos
-			     - ctrl_chars_on_this_line);
+			     - ctrl_chars_on_this_line
+#ifdef EXP_WCWIDTH_SUPPORT
+			     + utfxtracells_on_this_line
+#endif
+			     );
 	    }
 	    line->styles[line->numstyles].sc_style = (unsigned short) style;
 	    line->styles[line->numstyles].sc_direction = CAST_DIR(dir);

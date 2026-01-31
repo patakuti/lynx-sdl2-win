@@ -69,3 +69,4 @@ help_files.sed
 # Trace/debug logs
 win64-dist/LY-TRACE.LOG
 CLAUDE.md
+lynx_cfg.h

@@ -68,9 +68,9 @@
       ```
     - OpenSSLのダウンロードと展開
       ```bash
-      wget https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-openssl-3.4.0-1-any.pkg.tar.zst
-      tar -I zstd -xf mingw-w64-x86_64-openssl-3.4.0-1-any.pkg.tar.zst
-      mv mingw64 openssl-3.4.0
+      wget https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-openssl-3.4.1-1-any.pkg.tar.zst
+      tar -I zstd -xf mingw-w64-x86_64-openssl-3.4.1-1-any.pkg.tar.zst
+      mv mingw64 openssl-3.4.1
       ```
 
   - 1. PDCursesのビルド
@@ -99,8 +99,8 @@
     make
     cp src/lynx.exe win64-dist/
     # OpenSSL DLLもコピー
-    cp win64-libs/openssl-3.4.0/bin/libssl-3-x64.dll win64-dist/
-    cp win64-libs/openssl-3.4.0/bin/libcrypto-3-x64.dll win64-dist/
+    cp win64-libs/openssl-3.4.1/bin/libssl-3-x64.dll win64-dist/
+    cp win64-libs/openssl-3.4.1/bin/libcrypto-3-x64.dll win64-dist/
     ```
 
 - 重要な設定ファイル

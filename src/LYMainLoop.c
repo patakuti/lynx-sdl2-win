@@ -6321,6 +6321,18 @@ int mainloop(void)
 	    } else if (!dump_output_immediately) {
 		StrAllocCopy(curdoc.title, newdoc.title);
 	    }
+#ifdef PDCURSES
+	    /* Set window title to show current page title */
+	    if (curdoc.title && *curdoc.title) {
+		char window_title[256];
+
+		snprintf(window_title, sizeof(window_title),
+			 "Lynx: %s", curdoc.title);
+		PDC_set_title(window_title);
+	    } else {
+		PDC_set_title("Lynx");
+	    }
+#endif
 	    StrAllocCopy(owner_address, HText_getOwner());
 	    curdoc.safe = HTLoadedDocumentIsSafe();
 	    if (!dump_output_immediately) {
@@ -6589,6 +6601,18 @@ int mainloop(void)
 		} else {
 		    StrAllocCopy(curdoc.title, newdoc.title);
 		}
+#ifdef PDCURSES
+		/* Set window title to show current page title */
+		if (curdoc.title && *curdoc.title) {
+		    char window_title[256];
+
+		    snprintf(window_title, sizeof(window_title),
+			     "Lynx: %s", curdoc.title);
+		    PDC_set_title(window_title);
+		} else {
+		    PDC_set_title("Lynx");
+		}
+#endif
 	    }
 
 	    /*

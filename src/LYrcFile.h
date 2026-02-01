@@ -189,6 +189,7 @@
 #define RC_PDC_FONT                     "pdc_font"
 #define RC_PDC_FONT_INDEX               "pdc_font_index"
 #define RC_PDC_FONT_SIZE                "pdc_font_size"
+#define RC_PDC_ICON                     "pdc_icon"
 #define RC_PERSISTENT_COOKIES           "persistent_cookies"
 #define RC_PERSONAL_EXTENSION_MAP       "personal_extension_map"
 #define RC_PERSONAL_MAILCAP             "personal_mailcap"

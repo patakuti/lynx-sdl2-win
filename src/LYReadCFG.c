@@ -1668,6 +1668,7 @@ static Config_Type Config_Table [] =
      PARSE_ENV(RC_PDC_FONT,             0),
      PARSE_ENV(RC_PDC_FONT_INDEX,       0),
      PARSE_ENV(RC_PDC_FONT_SIZE,        0),
+     PARSE_ENV(RC_PDC_ICON,             0),
 #endif
 #ifdef USE_PERSISTENT_COOKIES
      PARSE_SET(RC_PERSISTENT_COOKIES,   persistent_cookies),

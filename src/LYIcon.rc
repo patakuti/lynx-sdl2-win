@@ -2,7 +2,7 @@
 
 #include <windows.h>
 
-100	ICON	"../samples/lynx.ico"
+100	ICON	"../samples/lynx-sdl.ico"
 
 VS_VERSION_INFO VERSIONINFO
 FILEVERSION    2,9,2,0
@@ -21,7 +21,7 @@ BEGIN
       VALUE "FileDescription",  "Lynx - web browser"
       VALUE "FileVersion",      "2.9.2.0"
       VALUE "InternalName",     "Lynx"
-      VALUE "LegalCopyright",   "©1997-2024 Thomas E. Dickey"
+      VALUE "LegalCopyright",   "ï¿½1997-2024 Thomas E. Dickey"
       VALUE "OriginalFilename", "lynx.exe"
       VALUE "ProductName",      "Lynx - web browser"
       VALUE "ProductVersion",   "2.9.2.0"

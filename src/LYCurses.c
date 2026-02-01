@@ -1413,6 +1413,17 @@ void start_curses(void)
     }
 #endif
 
+#ifdef PDCURSES
+    /*
+     * Set default window icon for PDCurses SDL2 backend.
+     * Must be set before initscr() is called.
+     */
+    if (!lynx_called_initscr && !LYGetEnv("PDC_ICON")) {
+	static char pdc_icon_putenv[] = "PDC_ICON=lynx-sdl.bmp";
+	putenv(pdc_icon_putenv);
+    }
+#endif
+
     if (!LYscreen) {
 	/*
 	 * If we're not VMS then only do initscr() one time, and one time only!

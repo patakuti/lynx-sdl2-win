@@ -1,3 +1,37 @@
+                        Lynx SDL2 for Windows
+
+This is a fork of Lynx 2.9.2, modified to run in an SDL2 window using
+PDCurses for SDL2.
+
+WHY THIS FORK?
+
+   Windows 11 made the traditional Command Prompt non-standard, and the
+   previous Windows builds of Lynx could not accept Japanese input via IME.
+   By using SDL2 instead of the console, this version enables proper IME
+   support for Japanese text input on Windows.
+
+FEATURES
+
+   - Runs in an SDL2 GUI window (not a console)
+   - Japanese IME input support
+   - CJK character display with proper width handling
+   - SSL/TLS support via OpenSSL
+
+BUILDING
+
+   See BUILDING-WIN64 for build instructions.
+
+LICENSE
+
+   This fork inherits licenses from:
+   - Lynx: GPLv2
+   - PDCurses: Public Domain
+   - SDL2: zlib License
+
+------------------------------------------------------------------------------
+                         Original Lynx README
+------------------------------------------------------------------------------
+
                              Lynx README file
 
 Lynx Version 2.9.2 is the latest release (May 2024).
@@ -16,13 +50,13 @@ WHAT IS LYNX?
 
    Lynx is a fully-featured World Wide Web (WWW) client for users running
    cursor-addressable, character-cell display devices such as vt100 terminals,
-   vt100 emulators or any other character-cell display. 
+   vt100 emulators or any other character-cell display.
 
    Lynx will display Hypertext Markup Language (HTML) documents containing
    links to files on the local system, as well as files on remote systems
    running http, gopher, ftp, wais, nntp, finger, or cso/ph/qi servers, and
    services accessible via logins to telnet, tn3270 or rlogin accounts.
-   
+
    Lynx runs on any POSIX platform as well as Windows.
 
    Older releases also work with VMS, Windows95 (and up), 386DOS and OS/2 EMX.

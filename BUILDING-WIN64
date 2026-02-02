@@ -1,0 +1,97 @@
+                    Building Lynx SDL2 for Windows 64-bit
+
+This document describes how to cross-compile Lynx SDL2 for Windows 64-bit
+using MinGW on Linux.
+
+PREREQUISITES
+
+   - Linux build environment (Ubuntu or similar)
+   - MinGW cross-compiler: x86_64-w64-mingw32-gcc
+
+DIRECTORY STRUCTURE
+
+   lynx-sdl2/
+   +-- PDCurses/          PDCurses source (with CJK modifications)
+   +-- src/               Lynx source (with CJK modifications)
+   +-- WWW/               WWW library
+   +-- win64-libs/        Windows libraries (download required)
+   +-- win64-dist/        Distribution directory for Windows binaries
+
+STEP 0: DOWNLOAD REQUIRED LIBRARIES (first time only)
+
+   Create win64-libs/ directory and download the following:
+
+   SDL2:
+       wget https://github.com/libsdl-org/SDL/releases/download/release-2.30.10/SDL2-devel-2.30.10-mingw.tar.gz
+       tar xzf SDL2-devel-2.30.10-mingw.tar.gz
+
+   SDL2_ttf:
+       wget https://github.com/libsdl-org/SDL_ttf/releases/download/release-2.22.0/SDL2_ttf-devel-2.22.0-mingw.tar.gz
+       tar xzf SDL2_ttf-devel-2.22.0-mingw.tar.gz
+
+   OpenSSL:
+       wget https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-openssl-3.4.1-1-any.pkg.tar.zst
+       tar -I zstd -xf mingw-w64-x86_64-openssl-3.4.1-1-any.pkg.tar.zst
+       mv mingw64 openssl-3.4.1
+
+STEP 1: BUILD PDCURSES
+
+   cd PDCurses/sdl2
+   SDL2_DIR=../../win64-libs/SDL2-2.30.10/x86_64-w64-mingw32
+   SDL2_TTF_DIR=../../win64-libs/SDL2_ttf-2.22.0/x86_64-w64-mingw32
+   make clean
+   make CC=x86_64-w64-mingw32-gcc AR=x86_64-w64-mingw32-ar WIDE=Y UTF8=Y \
+     CFLAGS="-O2 -DPDC_WIDE -DPDC_FORCE_UTF8 -I${SDL2_DIR}/include/SDL2 -I${SDL2_TTF_DIR}/include/SDL2"
+   cd ../..
+
+STEP 2: CONFIGURE LYNX
+
+   ./configure_win64.sh
+
+   Note: Enable EXP_WCWIDTH_SUPPORT in lynx_cfg.h after configure:
+       #define EXP_WCWIDTH_SUPPORT 1
+
+STEP 3: BUILD LYNX
+
+   make
+   cp src/lynx.exe win64-dist/
+
+STEP 4: COPY REQUIRED DLLS
+
+   Copy the following DLLs to win64-dist/:
+
+   From win64-libs/SDL2-2.30.10/x86_64-w64-mingw32/bin/:
+       SDL2.dll
+
+   From win64-libs/SDL2_ttf-2.22.0/x86_64-w64-mingw32/bin/:
+       SDL2_ttf.dll
+
+   From win64-libs/openssl-3.4.1/bin/:
+       libssl-3-x64.dll
+       libcrypto-3-x64.dll
+
+FONT CONFIGURATION
+
+   Configure fonts in lynx.cfg (recommended for Windows):
+
+       PDC_FONT:C:\Windows\Fonts\msgothic.ttc
+       PDC_FONT_INDEX:0
+       PDC_FONT_SIZE:18
+
+   Or use environment variables (override lynx.cfg):
+
+       set PDC_FONT=C:\Windows\Fonts\msgothic.ttc
+       set PDC_FONT_INDEX=0
+       set PDC_FONT_SIZE=18
+
+DISTRIBUTION
+
+   The win64-dist/ directory should contain:
+       lynx.exe
+       lynx.cfg
+       SDL2.dll
+       SDL2_ttf.dll
+       libssl-3-x64.dll
+       libcrypto-3-x64.dll
+
+------------------------------------------------------------------------------

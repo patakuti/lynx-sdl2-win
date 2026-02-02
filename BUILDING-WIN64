@@ -72,16 +72,18 @@ STEP 4: COPY REQUIRED DLLS
 
 FONT CONFIGURATION
 
-   Configure fonts in lynx.cfg (recommended for Windows):
+   A bundled font (Noto Sans Mono CJK JP) is included in fonts/ directory.
+   This is the recommended configuration because Windows 11 restricts user
+   access to C:\Windows\Fonts.
 
-       PDC_FONT:C:\Windows\Fonts\msgothic.ttc
-       PDC_FONT_INDEX:0
+   Default setting in lynx.cfg:
+
+       PDC_FONT:fonts\NotoSansMonoCJKjp-Regular.otf
        PDC_FONT_SIZE:18
 
    Or use environment variables (override lynx.cfg):
 
-       set PDC_FONT=C:\Windows\Fonts\msgothic.ttc
-       set PDC_FONT_INDEX=0
+       set PDC_FONT=fonts\NotoSansMonoCJKjp-Regular.otf
        set PDC_FONT_SIZE=18
 
 DISTRIBUTION
@@ -89,9 +91,14 @@ DISTRIBUTION
    The win64-dist/ directory should contain:
        lynx.exe
        lynx.cfg
+       lynx.lss
+       lynx-sdl.bmp
+       README.txt
        SDL2.dll
        SDL2_ttf.dll
        libssl-3-x64.dll
        libcrypto-3-x64.dll
+       fonts/
+           NotoSansMonoCJKjp-Regular.otf
 
 ------------------------------------------------------------------------------

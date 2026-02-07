@@ -34,6 +34,11 @@ STEP 0: DOWNLOAD REQUIRED LIBRARIES (first time only)
        tar -I zstd -xf mingw-w64-x86_64-openssl-3.4.1-1-any.pkg.tar.zst
        mv mingw64 openssl-3.4.1
 
+   libiconv (for CJK charset conversion):
+       wget https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-libiconv-1.17-4-any.pkg.tar.zst
+       tar -I zstd -xf mingw-w64-x86_64-libiconv-1.17-4-any.pkg.tar.zst
+       mv mingw64 libiconv-1.17
+
 STEP 1: BUILD PDCURSES
 
    cd PDCurses/sdl2
@@ -70,6 +75,10 @@ STEP 4: COPY REQUIRED DLLS
        libssl-3-x64.dll
        libcrypto-3-x64.dll
 
+   From win64-libs/libiconv-1.17/bin/:
+       libiconv-2.dll
+       libcharset-1.dll
+
 FONT CONFIGURATION
 
    A bundled font (Noto Sans Mono CJK JP) is included in fonts/ directory.
@@ -98,6 +107,8 @@ DISTRIBUTION
        SDL2_ttf.dll
        libssl-3-x64.dll
        libcrypto-3-x64.dll
+       libiconv-2.dll
+       libcharset-1.dll
        fonts/
            NotoSansMonoCJKjp-Regular.otf
 

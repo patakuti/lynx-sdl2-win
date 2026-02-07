@@ -43,6 +43,21 @@
 #include <LYShowInfo.h>
 #include <LYLeaks.h>
 
+#ifdef EXP_WCWIDTH_SUPPORT
+#  if defined(PDCURSES) && defined(PDC_WIDE)
+     /* PDCurses SDL2: use mk_wcwidth for consistent CJK width handling */
+#    include <wcwidth.h>
+#    define wcwidth(n) mk_wcwidth(n)
+#  elif defined(HAVE_WCWIDTH)
+#    ifdef HAVE_WCHAR_H
+#      include <wchar.h>
+#    endif
+#  else
+#    include <wcwidth.h>
+#    define wcwidth(n) mk_wcwidth(n)
+#  endif
+#endif
+
 #if defined(WIN_EX)
 #undef  BUTTON_CTRL
 #define BUTTON_CTRL	0	/* Quick hack */
@@ -817,7 +832,10 @@ static int myGetChar(void)
 	case KEY_CONTROL_R:
 	case KEY_ALT_L:
 	case KEY_ALT_R:
+	    break;
 	case KEY_RESIZE:
+	    /* Handle window resize from mouse/OS */
+	    done = TRUE;
 	    break;
 	default:
 	    done = TRUE;
@@ -2251,6 +2269,17 @@ static int LYgetch_for(int code)
 #endif /* KEY_BTAB */
 #ifdef KEY_RESIZE
 	case KEY_RESIZE:
+	    CTRACE((tfp, "KEY_RESIZE received: LINES=%d, COLS=%d, LYlines=%d, LYcols=%d\n",
+		    LINES, COLS, LYlines, LYcols));
+#if defined(PDCURSES) && defined(HAVE_RESIZETERM)
+	    /* PDCurses/SDL2: handle window resize */
+	    resize_term(0, 0);
+	    CTRACE((tfp, "After resize_term(0,0): LINES=%d, COLS=%d\n", LINES, COLS));
+	    LYGetScreenSize(0);
+	    CTRACE((tfp, "After LYGetScreenSize: LYlines=%d, LYcols=%d, recent_sizechange=%d\n",
+		    LYlines, LYcols, recent_sizechange));
+	    recent_sizechange = TRUE;
+#endif
 	    c = DO_NOTHING;
 	    break;
 #endif /* KEY_RESIZE */
@@ -2560,7 +2589,14 @@ static int LYgetch_for(int code)
 	 * Don't return raw values for KEYPAD symbols which we may have missed
 	 * in the switch above if they are obviously invalid when used as an
 	 * index into (e.g.) keypad[].  - KW
+	 *
+	 * However, for Unicode characters from IME input (e.g., Japanese),
+	 * we need to pass them through so they can be handled properly.
+	 * Unicode characters typically start at 0x80 and go up to 0x10FFFF.
 	 */
+	if (c >= 0x80 && c <= 0x10FFFF) {
+	    return (c);  /* Pass through Unicode characters */
+	}
 	return (0);
     } else {
 	return (c | current_modifier);
@@ -3164,6 +3200,17 @@ int LYEditInsert(FieldEditor * edit, unsigned const char *s,
     int edited = 0, overflow = 0;
 
     /*
+     * First try to extend the buffer if needed.
+     * This is especially important for UTF-8 multibyte characters.
+     */
+    if (remains < 0) {
+	/* Try to extend the buffer first */
+	ExtendEditor(edit, length + len);
+	/* Recalculate remains after potential extension */
+	remains = (int) BufAlloc - (length + len);
+    }
+
+    /*
      * ch is (presumably) printable character.
      */
     if (remains < 0) {
@@ -3171,7 +3218,7 @@ int LYEditInsert(FieldEditor * edit, unsigned const char *s,
 	len = 0;
 	if ((int) BufAlloc > length)	/* Insert as much as we can */
 	    len = (int) BufAlloc - length;
-	else
+	if (len == 0)
 	    goto finish;
     }
     ExtendEditor(edit, length + len);
@@ -3308,8 +3355,26 @@ int LYDoEdit(FieldEditor * edit, int ch,
 #endif
 	/* FALLTHRU */
     case LYE_CHAR:
-	uch = UCH(ch);
-	LYEditInsert(edit, &uch, 1, map_active, maxMessage);
+	/*
+	 * Handle Unicode characters (e.g., from IME input) by converting
+	 * to UTF-8 before inserting into the edit buffer.
+	 */
+	if (ch > 255) {
+	    char utfbuf[8];
+	    if (UCConvertUniToUtf8((UCode_t) ch, utfbuf)) {
+		int utflen = (int) strlen(utfbuf);
+		/*
+		 * Pass 0 for map to skip keyboard layout mapping entirely.
+		 * The UTF-8 bytes are already the final representation and
+		 * should be copied as-is using StrNCpy.
+		 */
+		LYEditInsert(edit, (unsigned const char *) utfbuf,
+			     utflen, 0, maxMessage);
+	    }
+	} else {
+	    uch = UCH(ch);
+	    LYEditInsert(edit, &uch, 1, map_active, maxMessage);
+	}
 	return 0;		/* All changes already registered */
 
     case LYE_C1CHAR:
@@ -3915,7 +3980,9 @@ void LYRefreshEdit(FieldEditor * edit)
 	    TmpStyleOn(prompting ? s_prompt_sel : s_aedit_sel);
 #endif
 	remember_column(edit, 0);
-	for (i = 0; i < dpy_bytes; i++) {
+	for (i = 0; i < dpy_bytes; ) {
+	    int char_len = 1;  /* Length of current character in bytes */
+
 #if defined(ENHANCED_LINEEDIT) && defined(USE_COLOR_STYLE)
 	    if (EditMark >= 0 && ((DpyStart + i == EditMark && EditAt > EditMark)
 				  || (DpyStart + i == EditAt && EditAt < EditMark)))
@@ -3941,10 +4008,34 @@ void LYRefreshEdit(FieldEditor * edit)
 		while (++col % 8)
 		    LYaddch(' ');
 		LYaddch(' ');
+#if defined(PDCURSES) && defined(PDC_FORCE_UTF8)
+	    } else if ((UCH(str[i]) & 0xC0) == 0xC0) {
+		/*
+		 * UTF-8 multibyte character: output the entire sequence at once.
+		 * Determine the length of the UTF-8 sequence from the first byte.
+		 * For PDCurses with PDC_FORCE_UTF8, always treat as UTF-8.
+		 */
+		unsigned char c = UCH(str[i]);
+		if ((c & 0xE0) == 0xC0) {
+		    char_len = 2;  /* 110xxxxx: 2-byte sequence */
+		} else if ((c & 0xF0) == 0xE0) {
+		    char_len = 3;  /* 1110xxxx: 3-byte sequence */
+		} else if ((c & 0xF8) == 0xF0) {
+		    char_len = 4;  /* 11110xxx: 4-byte sequence */
+		}
+		/* Ensure we don't read past the buffer */
+		if (i + char_len <= dpy_bytes) {
+		    LYwaddnstr(LYwin, &str[i], (size_t) char_len);
+		} else {
+		    LYaddch('?');  /* Incomplete sequence */
+		    char_len = 1;
+		}
+#endif
 	    } else {
 		LYaddch(UCH(str[i]));
 	    }
-	    remember_column(edit, i + 1);
+	    i += char_len;
+	    remember_column(edit, i);
 	}
 #if defined(ENHANCED_LINEEDIT) && defined(USE_COLOR_STYLE)
 	if (EditMark >= 0 &&
@@ -5750,7 +5841,42 @@ const char *LYno_attr_mbcs_case_strstr(const char *haystack,
 			}
 
 			if (!IS_UTF_EXTRA(*tstptr)) {
-			    tarlen++;
+#if defined(PDCURSES) && defined(PDC_WIDE) && defined(EXP_WCWIDTH_SUPPORT)
+			    /*
+			     * PDCurses SDL2 with UTF-8: calculate cell width
+			     * for CJK characters using mk_wcwidth.
+			     */
+			    if (utf_flag && count_gcells && is8bits(*tstptr)) {
+				unsigned char ch = (unsigned char)*tstptr;
+				if ((ch & 0xE0) == 0xC0 && tstptr + 1 < refptr) {
+				    /* 2-byte UTF-8 */
+				    wchar_t wc = ((ch & 0x1F) << 6) | (tstptr[1] & 0x3F);
+				    int w = mk_wcwidth(wc);
+				    tarlen += (w > 0) ? w : 1;
+				} else if ((ch & 0xF0) == 0xE0 && tstptr + 2 < refptr) {
+				    /* 3-byte UTF-8 (CJK characters) */
+				    wchar_t wc = ((ch & 0x0F) << 12) |
+						 ((tstptr[1] & 0x3F) << 6) |
+						 (tstptr[2] & 0x3F);
+				    int w = mk_wcwidth(wc);
+				    tarlen += (w > 0) ? w : 1;
+				} else if ((ch & 0xF8) == 0xF0 && tstptr + 3 < refptr) {
+				    /* 4-byte UTF-8 */
+				    wchar_t wc = ((ch & 0x07) << 18) |
+						 ((tstptr[1] & 0x3F) << 12) |
+						 ((tstptr[2] & 0x3F) << 6) |
+						 (tstptr[3] & 0x3F);
+				    int w = mk_wcwidth(wc);
+				    tarlen += (w > 0) ? w : 1;
+				} else {
+				    /* ASCII or invalid UTF-8 */
+				    tarlen++;
+				}
+			    } else
+#endif
+			    {
+				tarlen++;
+			    }
 			}
 			refptr++;
 			tstptr++;
@@ -5765,6 +5891,11 @@ const char *LYno_attr_mbcs_case_strstr(const char *haystack,
 			if (nendp)
 			    *nendp = len + tarlen;
 			result = haystack;
+			CTRACE((tfp, "WHEREIS_DEBUG: LYno_attr_mbcs_strstr found match\n"));
+			CTRACE((tfp, "WHEREIS_DEBUG:   offset=%d (nstartp) len+tarlen=%d (nendp)\n",
+				offset, len + tarlen));
+			CTRACE((tfp, "WHEREIS_DEBUG:   utf_flag=%d count_gcells=%d\n",
+				utf_flag, count_gcells));
 			break;
 		    }
 		    if (*refptr == '\0')
@@ -5778,7 +5909,44 @@ const char *LYno_attr_mbcs_case_strstr(const char *haystack,
 		    if (count_gcells)
 			len++;
 		}
-		len++;
+#if defined(PDCURSES) && defined(PDC_WIDE) && defined(EXP_WCWIDTH_SUPPORT)
+		/*
+		 * PDCurses SDL2 with UTF-8: calculate cell width
+		 * for CJK characters using mk_wcwidth.
+		 */
+		if (utf_flag && count_gcells && is8bits(*haystack)) {
+		    unsigned char ch = (unsigned char)*haystack;
+		    if ((ch & 0xE0) == 0xC0 && IsNormalChar(*(haystack + 1))) {
+			/* 2-byte UTF-8 */
+			wchar_t wc = ((ch & 0x1F) << 6) | (haystack[1] & 0x3F);
+			int w = mk_wcwidth(wc);
+			len += (w > 0) ? w : 1;
+		    } else if ((ch & 0xF0) == 0xE0 && IsNormalChar(*(haystack + 1)) &&
+			       IsNormalChar(*(haystack + 2))) {
+			/* 3-byte UTF-8 (CJK characters) */
+			wchar_t wc = ((ch & 0x0F) << 12) |
+				     ((haystack[1] & 0x3F) << 6) |
+				     (haystack[2] & 0x3F);
+			int w = mk_wcwidth(wc);
+			len += (w > 0) ? w : 1;
+		    } else if ((ch & 0xF8) == 0xF0 && IsNormalChar(*(haystack + 1)) &&
+			       IsNormalChar(*(haystack + 2)) && IsNormalChar(*(haystack + 3))) {
+			/* 4-byte UTF-8 */
+			wchar_t wc = ((ch & 0x07) << 18) |
+				     ((haystack[1] & 0x3F) << 12) |
+				     ((haystack[2] & 0x3F) << 6) |
+				     (haystack[3] & 0x3F);
+			int w = mk_wcwidth(wc);
+			len += (w > 0) ? w : 1;
+		    } else {
+			/* ASCII or invalid UTF-8 */
+			len++;
+		    }
+		} else
+#endif
+		{
+		    len++;
+		}
 	    }
 	}
     }
@@ -5886,7 +6054,42 @@ const char *LYno_attr_mbcs_strstr(const char *haystack,
 			}
 
 			if (!IS_UTF_EXTRA(*tstptr)) {
-			    tarlen++;
+#if defined(PDCURSES) && defined(PDC_WIDE) && defined(EXP_WCWIDTH_SUPPORT)
+			    /*
+			     * PDCurses SDL2 with UTF-8: calculate cell width
+			     * for CJK characters using mk_wcwidth.
+			     */
+			    if (utf_flag && count_gcells && is8bits(*tstptr)) {
+				unsigned char ch = (unsigned char)*tstptr;
+				if ((ch & 0xE0) == 0xC0 && tstptr + 1 < refptr) {
+				    /* 2-byte UTF-8 */
+				    wchar_t wc = ((ch & 0x1F) << 6) | (tstptr[1] & 0x3F);
+				    int w = mk_wcwidth(wc);
+				    tarlen += (w > 0) ? w : 1;
+				} else if ((ch & 0xF0) == 0xE0 && tstptr + 2 < refptr) {
+				    /* 3-byte UTF-8 (CJK characters) */
+				    wchar_t wc = ((ch & 0x0F) << 12) |
+						 ((tstptr[1] & 0x3F) << 6) |
+						 (tstptr[2] & 0x3F);
+				    int w = mk_wcwidth(wc);
+				    tarlen += (w > 0) ? w : 1;
+				} else if ((ch & 0xF8) == 0xF0 && tstptr + 3 < refptr) {
+				    /* 4-byte UTF-8 */
+				    wchar_t wc = ((ch & 0x07) << 18) |
+						 ((tstptr[1] & 0x3F) << 12) |
+						 ((tstptr[2] & 0x3F) << 6) |
+						 (tstptr[3] & 0x3F);
+				    int w = mk_wcwidth(wc);
+				    tarlen += (w > 0) ? w : 1;
+				} else {
+				    /* ASCII or invalid UTF-8 */
+				    tarlen++;
+				}
+			    } else
+#endif
+			    {
+				tarlen++;
+			    }
 			}
 			refptr++;
 			tstptr++;
@@ -5900,6 +6103,11 @@ const char *LYno_attr_mbcs_strstr(const char *haystack,
 			if (nendp)
 			    *nendp = len + tarlen;
 			result = haystack;
+			CTRACE((tfp, "WHEREIS_DEBUG: LYno_attr_mbcs_strstr found match\n"));
+			CTRACE((tfp, "WHEREIS_DEBUG:   offset=%d (nstartp) len+tarlen=%d (nendp)\n",
+				offset, len + tarlen));
+			CTRACE((tfp, "WHEREIS_DEBUG:   utf_flag=%d count_gcells=%d\n",
+				utf_flag, count_gcells));
 			break;
 		    }
 		    if (*refptr == '\0')
@@ -5913,7 +6121,44 @@ const char *LYno_attr_mbcs_strstr(const char *haystack,
 		    if (count_gcells)
 			len++;
 		}
-		len++;
+#if defined(PDCURSES) && defined(PDC_WIDE) && defined(EXP_WCWIDTH_SUPPORT)
+		/*
+		 * PDCurses SDL2 with UTF-8: calculate cell width
+		 * for CJK characters using mk_wcwidth.
+		 */
+		if (utf_flag && count_gcells && is8bits(*haystack)) {
+		    unsigned char ch = (unsigned char)*haystack;
+		    if ((ch & 0xE0) == 0xC0 && IsNormalChar(*(haystack + 1))) {
+			/* 2-byte UTF-8 */
+			wchar_t wc = ((ch & 0x1F) << 6) | (haystack[1] & 0x3F);
+			int w = mk_wcwidth(wc);
+			len += (w > 0) ? w : 1;
+		    } else if ((ch & 0xF0) == 0xE0 && IsNormalChar(*(haystack + 1)) &&
+			       IsNormalChar(*(haystack + 2))) {
+			/* 3-byte UTF-8 (CJK characters) */
+			wchar_t wc = ((ch & 0x0F) << 12) |
+				     ((haystack[1] & 0x3F) << 6) |
+				     (haystack[2] & 0x3F);
+			int w = mk_wcwidth(wc);
+			len += (w > 0) ? w : 1;
+		    } else if ((ch & 0xF8) == 0xF0 && IsNormalChar(*(haystack + 1)) &&
+			       IsNormalChar(*(haystack + 2)) && IsNormalChar(*(haystack + 3))) {
+			/* 4-byte UTF-8 */
+			wchar_t wc = ((ch & 0x07) << 18) |
+				     ((haystack[1] & 0x3F) << 12) |
+				     ((haystack[2] & 0x3F) << 6) |
+				     (haystack[3] & 0x3F);
+			int w = mk_wcwidth(wc);
+			len += (w > 0) ? w : 1;
+		    } else {
+			/* ASCII or invalid UTF-8 */
+			len++;
+		    }
+		} else
+#endif
+		{
+		    len++;
+		}
 	    }
 	}
     }

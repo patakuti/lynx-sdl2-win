@@ -46,6 +46,10 @@
 #include <LYexit.h>
 #include <LYLeaks.h>
 
+#ifdef _WINDOWS
+#include <windows.h>
+#endif
+
 #ifdef USE_COLOR_STYLE
 #include <AttrList.h>
 #include <LYHash.h>
@@ -53,7 +57,11 @@
 #endif
 
 #ifdef EXP_WCWIDTH_SUPPORT
-#  ifdef HAVE_WCWIDTH
+#  if defined(PDCURSES) && defined(PDC_WIDE)
+     /* PDCurses SDL2: always use mk_wcwidth for consistent CJK width handling */
+#    include <wcwidth.h>
+#    define wcwidth(n) mk_wcwidth(n)
+#  elif defined(HAVE_WCWIDTH)
 #    ifdef HAVE_WCHAR_H
 #      include <wchar.h>
 #    endif
@@ -609,8 +617,8 @@ static int utfxtra_on_this_line = 0;	/* num of UTF-8 extra bytes in line,
 static int utfxtracells_on_this_line = 0;	/* num of UTF-8 extra cells in line */
 #endif
 
-#ifdef WIDEC_CURSES
-# ifdef EXP_WCWIDTH_SUPPORT	/* TODO: support for !WIDEC_CURSES */
+#if defined(WIDEC_CURSES) || (defined(PDCURSES) && defined(PDC_WIDE))
+# ifdef EXP_WCWIDTH_SUPPORT
 #define UTFXTRA_ON_THIS_LINE utfxtracells_on_this_line
 # else
 #define UTFXTRA_ON_THIS_LINE 0
@@ -4177,6 +4185,30 @@ void HText_appendCharacter(HText *text, int ch)
 	 * to the line here and return.  - kw
 	 */
 	if (IS_UTF_EXTRA(ch)) {
+#ifdef EXP_WCWIDTH_SUPPORT
+	    /* Pre-update utfxtracells_on_this_line if this ch completes UTF-8 sequence */
+	    {
+		int utff = line->size - 1;
+		int utf_xlen;
+
+		while (utff > 0 && IS_UTF_EXTRA(line->data[utff]))
+		    utff--;
+		utf_xlen = UTF_XLEN(line->data[utff]);
+
+		if (line->size - utff == utf_xlen) {
+		    /* Build complete UTF-8 sequence in temp buffer (line->data + ch) */
+		    char temp[8];
+		    int i, bytes_in_line = line->size - utff;
+
+		    for (i = 0; i < bytes_in_line; i++)
+			temp[i] = line->data[utff + i];
+		    temp[bytes_in_line] = ch;
+		    temp[bytes_in_line + 1] = '\0';
+
+		    utfxtracells_on_this_line += utfextracells(temp);
+		}
+	    }
+#endif
 	    if ((line->size > (MAX_LINE - 1))
 		|| (indent + (int) (line->offset + line->size)
 		    + UTFXTRA_ON_THIS_LINE
@@ -4210,9 +4242,8 @@ void HText_appendCharacter(HText *text, int ch)
 		ctrl_chars_on_this_line++;
 	    }
 #ifdef EXP_WCWIDTH_SUPPORT
-	    /* update utfxtracells_on_this_line on last byte of UTF-8 sequence */
+	    /* permit_split_after_CJchar on last byte of UTF-8 sequence */
 	    {
-		/* find start position of UTF-8 sequence */
 		int utff = line->size - 2;
 		int utf_xlen;
 
@@ -4221,7 +4252,6 @@ void HText_appendCharacter(HText *text, int ch)
 		utf_xlen = UTF_XLEN(line->data[utff]);
 
 		if (line->size - utff == utf_xlen + 1) {	/* have last byte */
-		    utfxtracells_on_this_line += utfextracells(&(line->data[utff]));
 		    permit_split_after_CJchar(text, &(line->data[utff]), line->size);
 		}
 	    }
@@ -4451,6 +4481,10 @@ void HText_appendCharacter(HText *text, int ch)
 	     + utfxtracells_on_this_line
 #endif
 	    ) >= WRAP_COLS(text))
+#if defined(PDCURSES) && defined(PDC_WIDE) && defined(EXP_WCWIDTH_SUPPORT)
+	/* For PDCurses with wide char support, check wrap with CJK width */
+	|| ((actual + utfxtracells_on_this_line) >= WRAP_COLS(text))
+#endif
 	|| (text->T.output_utf8
 	    && ((actual
 		 + UTFXTRA_ON_THIS_LINE
@@ -6191,6 +6225,50 @@ static void HText_trimHightext(HText *text,
 		char *hi_string = NULL;
 		int hi_offset = line_ptr2->offset;
 
+#if defined(PDCURSES) && defined(PDC_WIDE) && defined(EXP_WCWIDTH_SUPPORT)
+		/* Convert byte/character offset to cell offset for CJK characters */
+		if (line_ptr2->data && hi_offset > 0) {
+		    int cell_offset = 0;
+		    const char *p = line_ptr2->data;
+		    const char *end = p + hi_offset;
+
+		    while (p < end && *p) {
+			if (is8bits(*p)) {
+			    unsigned char ch = (unsigned char)*p;
+			    wchar_t wc = 0;
+			    int bytes = 0;
+
+			    if ((ch & 0xE0) == 0xC0 && p + 1 < end) {
+				wc = ((ch & 0x1F) << 6) | (p[1] & 0x3F);
+				bytes = 2;
+			    } else if ((ch & 0xF0) == 0xE0 && p + 2 < end) {
+				wc = ((ch & 0x0F) << 12) | ((p[1] & 0x3F) << 6) | (p[2] & 0x3F);
+				bytes = 3;
+			    } else if ((ch & 0xF8) == 0xF0 && p + 3 < end) {
+				wc = ((ch & 0x07) << 18) | ((p[1] & 0x3F) << 12) |
+				     ((p[2] & 0x3F) << 6) | (p[3] & 0x3F);
+				bytes = 4;
+			    } else {
+				bytes = 1;
+			    }
+
+			    if (bytes > 1 && wc > 0) {
+				int w = mk_wcwidth(wc);
+				cell_offset += (w > 0) ? w : 1;
+				p += bytes;
+			    } else {
+				cell_offset++;
+				p++;
+			    }
+			} else {
+			    cell_offset++;
+			    p++;
+			}
+		    }
+		    hi_offset = cell_offset;
+		}
+#endif
+
 		StrnAllocCopy(hi_string,
 			      line_ptr2->data,
 			      (size_t) (actual_len - hilite_len));
@@ -6243,7 +6321,60 @@ static void HText_trimHightext(HText *text,
 	if (anchor_ptr->line_pos > 0) {
 	    register int offset = 0, i = 0;
 	    int have_soft_newline_in_1st_line = 0;
-
+#if defined(PDCURSES) && defined(PDC_WIDE) && defined(EXP_WCWIDTH_SUPPORT)
+	    /*
+	     * PDCurses SDL2 with wide character support: calculate cell position
+	     * properly for CJK characters using mk_wcwidth.
+	     */
+	    int cells = 0;
+	    for (; i < anchor_col; ) {
+		unsigned char ch = (unsigned char)line_ptr->data[i];
+		if (IsSpecialAttrChar(ch)) {
+		    offset++;
+		    have_soft_newline_in_1st_line += (ch == LY_SOFT_NEWLINE);
+		    i++;
+		} else if (IS_UTF_EXTRA(ch)) {
+		    /* UTF-8 continuation byte - skip, don't count */
+		    offset++;
+		    i++;
+		} else if (ch < 0x80) {
+		    /* ASCII */
+		    cells++;
+		    i++;
+		} else if ((ch & 0xE0) == 0xC0 && i + 1 < anchor_col) {
+		    /* 2-byte UTF-8 */
+		    wchar_t wc = ((ch & 0x1F) << 6) | (line_ptr->data[i+1] & 0x3F);
+		    int w = mk_wcwidth(wc);
+		    cells += (w > 0) ? w : 1;
+		    offset++;  /* count extra byte */
+		    i += 2;
+		} else if ((ch & 0xF0) == 0xE0 && i + 2 < anchor_col) {
+		    /* 3-byte UTF-8 (CJK characters) */
+		    wchar_t wc = ((ch & 0x0F) << 12) |
+				 ((line_ptr->data[i+1] & 0x3F) << 6) |
+				 (line_ptr->data[i+2] & 0x3F);
+		    int w = mk_wcwidth(wc);
+		    cells += (w > 0) ? w : 1;
+		    offset += 2;  /* count extra bytes */
+		    i += 3;
+		} else if ((ch & 0xF8) == 0xF0 && i + 3 < anchor_col) {
+		    /* 4-byte UTF-8 */
+		    wchar_t wc = ((ch & 0x07) << 18) |
+				 ((line_ptr->data[i+1] & 0x3F) << 12) |
+				 ((line_ptr->data[i+2] & 0x3F) << 6) |
+				 (line_ptr->data[i+3] & 0x3F);
+		    int w = mk_wcwidth(wc);
+		    cells += (w > 0) ? w : 1;
+		    offset += 3;  /* count extra bytes */
+		    i += 4;
+		} else {
+		    /* Invalid or incomplete UTF-8 */
+		    i++;
+		}
+	    }
+	    anchor_ptr->line_pos = (short) cells;
+	    anchor_ptr->line_pos = (short) (anchor_ptr->line_pos + have_soft_newline_in_1st_line);
+#else
 	    for (; i < anchor_col; i++) {
 		if (IS_UTF_EXTRA(line_ptr->data[i]) ||
 		    IsSpecialAttrChar(line_ptr->data[i])) {
@@ -6254,6 +6385,7 @@ static void HText_trimHightext(HText *text,
 	    anchor_ptr->line_pos = (short) (anchor_ptr->line_pos - offset);
 	    /*handle LY_SOFT_NEWLINEs -VH */
 	    anchor_ptr->line_pos = (short) (anchor_ptr->line_pos + have_soft_newline_in_1st_line);
+#endif /* PDCURSES && PDC_WIDE && EXP_WCWIDTH_SUPPORT */
 	}
 #endif /* WIDEC_CURSES */
 
@@ -7018,6 +7150,30 @@ BOOL HText_getFirstTargetInLine(HText *text, int line_num,
 	 */
 	*offset = (LineOffset + HitOffset);
 	*tLen = (LenNeeded - HitOffset);
+
+	CTRACE((tfp, "WHEREIS_DEBUG: HText_getFirstTargetInLine line_num=%d\n", line_num));
+	CTRACE((tfp, "WHEREIS_DEBUG:   LineOffset=%d HitOffset=%d LenNeeded=%d\n",
+		LineOffset, HitOffset, LenNeeded));
+	CTRACE((tfp, "WHEREIS_DEBUG:   *offset=%d *tLen=%d utf_flag=%d count_gcells=YES\n",
+		*offset, *tLen, utf_flag));
+	CTRACE((tfp, "WHEREIS_DEBUG:   cp byte offset from LineData: %d\n",
+		(int)(cp - LineData)));
+	{
+	    int i;
+	    CTRACE((tfp, "WHEREIS_DEBUG:   LineData hex: "));
+	    for (i = 0; i < 40 && LineData[i]; i++) {
+		CTRACE((tfp, "%02X ", (unsigned char)LineData[i]));
+	    }
+	    CTRACE((tfp, "\n"));
+	    CTRACE((tfp, "WHEREIS_DEBUG:   LineData str: '%s'\n", LineData));
+	    CTRACE((tfp, "WHEREIS_DEBUG:   cp (returned by LYno_attr_mb_strstr): '%s'\n", cp));
+	    CTRACE((tfp, "WHEREIS_DEBUG:   cp hex: "));
+	    for (i = 0; i < 20 && cp[i]; i++) {
+		CTRACE((tfp, "%02X ", (unsigned char)cp[i]));
+	    }
+	    CTRACE((tfp, "\n"));
+	}
+
 	StrAllocCopy(*data, cp);
 	remove_special_attr_chars(*data);
 	return (TRUE);
@@ -14179,6 +14335,18 @@ static void move_to_glyph(int YP,
 			  int flags,
 			  int utf_flag)
 {
+    /* DEBUG: Show MessageBox on first call to verify function is called */
+    static int first_call = 1;
+    if (first_call) {
+	first_call = 0;
+#ifdef _WINDOWS
+	char msg[256];
+	sprintf(msg, "move_to_glyph called!\nYP=%d XP=%d\ntarget=%s",
+		YP, XP, target ? target : "(null)");
+	MessageBoxA(NULL, msg, "DEBUG: move_to_glyph", MB_OK);
+#endif
+    }
+
     char buffer[7];
     const char *end_of_data;
     size_t utf_extra = 0;
@@ -14258,6 +14426,25 @@ static void move_to_glyph(int YP,
 	    } else {
 		i_start_tgt = i + HitOffset;
 		i_after_tgt = i + LenNeeded;
+#if defined(PDCURSES) && defined(PDC_WIDE) && defined(EXP_WCWIDTH_SUPPORT)
+		/* DEBUG: Log search highlight position calculation */
+		{
+		    FILE *fp = fopen("lynx_debug.log", "a");
+		    fprintf(stderr, "=== WHEREIS TARGET FOUND ===\n");
+		    fprintf(stderr, "target='%s' sdata='%.50s'\n", target, sdata);
+		    fprintf(stderr, "i=%d HitOffset=%d LenNeeded=%d\n", i, HitOffset, LenNeeded);
+		    fprintf(stderr, "i_start_tgt=%d i_after_tgt=%d\n", i_start_tgt, i_after_tgt);
+		    fprintf(stderr, "offset=%u XP=%d linkvlen=%d last_i=%d\n", offset, XP, linkvlen, last_i);
+		    if (fp) {
+			fprintf(fp, "=== WHEREIS TARGET FOUND ===\n");
+			fprintf(fp, "target='%s' sdata='%.50s'\n", target, sdata);
+			fprintf(fp, "i=%d HitOffset=%d LenNeeded=%d\n", i, HitOffset, LenNeeded);
+			fprintf(fp, "i_start_tgt=%d i_after_tgt=%d\n", i_start_tgt, i_after_tgt);
+			fprintf(fp, "offset=%u XP=%d linkvlen=%d last_i=%d\n", offset, XP, linkvlen, last_i);
+			fclose(fp);
+		    }
+		}
+#endif
 	    }
 	}
     } else {
@@ -14569,6 +14756,51 @@ static void move_to_glyph(int YP,
 		hadutf8 = YES;
 		utf_extra = utf8_length(utf_flag, data - 1);
 		LastDisplayChar = 'M';
+#if defined(PDCURSES) && defined(PDC_WIDE) && defined(EXP_WCWIDTH_SUPPORT)
+		/*
+		 * PDCurses SDL2 with UTF-8: check if this is a CJK character
+		 * and increment i by the character width (likely 2 for CJK).
+		 */
+		if (utf_extra > 0 && data - 1 < end_of_data) {
+		    wchar_t wc = 0;
+		    unsigned char ch = (unsigned char)buffer[0];
+		    int old_i = i;
+
+		    if ((ch & 0xE0) == 0xC0 && utf_extra == 1 && data < end_of_data) {
+			/* 2-byte UTF-8 */
+			wc = ((ch & 0x1F) << 6) | (*data & 0x3F);
+		    } else if ((ch & 0xF0) == 0xE0 && utf_extra == 2 && data + 1 < end_of_data) {
+			/* 3-byte UTF-8 (CJK characters) */
+			wc = ((ch & 0x0F) << 12) |
+			     ((*data & 0x3F) << 6) |
+			     (*(data + 1) & 0x3F);
+		    } else if ((ch & 0xF8) == 0xF0 && utf_extra == 3 && data + 2 < end_of_data) {
+			/* 4-byte UTF-8 */
+			wc = ((ch & 0x07) << 18) |
+			     ((*data & 0x3F) << 12) |
+			     ((*(data + 1) & 0x3F) << 6) |
+			     (*(data + 2) & 0x3F);
+		    }
+
+		    if (wc > 0) {
+			int w = mk_wcwidth(wc);
+			if (w > 1) {
+			    i += (w - 1);  /* Already incremented by 1, add the rest */
+			    /* DEBUG: Log when i is adjusted for CJK width */
+			    {
+				FILE *fp = fopen("lynx_debug.log", "a");
+				fprintf(stderr, "CJK char detected: U+%04X width=%d old_i=%d new_i=%d\n",
+					(unsigned)wc, w, old_i, i);
+				if (fp) {
+				    fprintf(fp, "CJK char detected: U+%04X width=%d old_i=%d new_i=%d\n",
+					    (unsigned)wc, w, old_i, i);
+				    fclose(fp);
+				}
+			    }
+			}
+		    }
+		}
+#endif
 	    }
 #endif
 	    if (utf_extra) {

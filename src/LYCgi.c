@@ -1,5 +1,5 @@
 /*
- * $LynxId: LYCgi.c,v 1.72 2018/03/18 18:56:05 tom Exp $
+ * $LynxId: LYCgi.c,v 1.75 2025/01/07 23:28:59 tom Exp $
  *                   Lynx CGI support                              LYCgi.c
  *                   ================
  *
@@ -158,7 +158,6 @@ static int LYLoadCGI(const char *arg,
  */
 static BOOL can_exec_cgi(const char *linktext, const char *linkargs)
 {
-    const char *format = gettext("Do you want to execute \"%s\"?");
     char *message = NULL;
     char *command = NULL;
     char *p;
@@ -176,7 +175,9 @@ static BOOL can_exec_cgi(const char *linktext, const char *linkargs)
 	for (p = command; *p; ++p)
 	    if (*p == '+')
 		*p = ' ';
-	HTSprintf0(&message, format, command);
+	HTSprintf0(&message,
+		   LY_MSG("Do you want to execute \"%s\"?"),
+		   command);
 	result = HTConfirm(message);
 	FREE(message);
 	FREE(command);
@@ -390,7 +391,7 @@ static int LYLoadCGI(const char *arg,
 			       sink, anAnchor);
 
 	if (target == NULL) {
-	    char *tmp = 0;
+	    char *tmp = NULL;
 
 	    HTSprintf0(&tmp, CANNOT_CONVERT_I_TO_O,
 		       HTAtom_name(format_in),
@@ -753,5 +754,5 @@ static int LYLoadCGI(const char *arg,
 GLOBALDEF(HTProtocol, LYLynxCGI, _LYCGI_C_GLOBALDEF_1_INIT);
 #else
 GLOBALDEF HTProtocol LYLynxCGI =
-{"lynxcgi", LYLoadCGI, 0};
+{"lynxcgi", LYLoadCGI, NULL};
 #endif /* GLOBALDEF_IS_MACRO */

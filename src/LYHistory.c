@@ -1,5 +1,5 @@
 /*
- * $LynxId: LYHistory.c,v 1.94 2021/06/09 22:55:43 tom Exp $
+ * $LynxId: LYHistory.c,v 1.97 2025/06/19 19:50:22 Eric.Lindblad Exp $
  */
 #include <HTUtils.h>
 #include <HTTP.h>
@@ -36,7 +36,7 @@ HTList *Visited_Links = NULL;	/* List of safe popped docs. */
 int Visited_Links_As = VISITED_LINKS_AS_LATEST | VISITED_LINKS_REVERSE;
 
 static VisitedLink *PrevVisitedLink = NULL;	/* NULL on auxiliary */
-static VisitedLink *PrevActiveVisitedLink = NULL;	/* Last non-auxillary */
+static VisitedLink *PrevActiveVisitedLink = NULL;	/* Last non-auxiliary */
 static VisitedLink Latest_first;
 static VisitedLink Latest_last;
 static VisitedLink *Latest_tree;
@@ -348,13 +348,13 @@ void LYAllocHistory(unsigned entries)
 	size_history += (entries + 2) * 2;
 	want = ((size_t) size_history) * sizeof(*history);
 
-	if (history == 0) {
+	if (history == NULL) {
 	    history = typecallocn(HistInfo, want);
 	} else {
 	    history = typeRealloc(HistInfo, history, want);
 	    memset(&history[save], 0, size_history - save);
 	}
-	if (history == 0)
+	if (history == NULL)
 	    outofmem(__FILE__, "LYAllocHistory");
     }
     CTRACE((tfp, "...LYAllocHistory %u vs %u\n", entries, size_history));
@@ -655,7 +655,7 @@ int showhistory(char **newfile)
     int x = 0;
     FILE *fp0;
 
-    if ((fp0 = InternalPageFP(tempfile, TRUE)) == 0)
+    if ((fp0 = InternalPageFP(tempfile, TRUE)) == NULL)
 	return (-1);
 
     LYLocalFileToURL(newfile, tempfile);
@@ -822,7 +822,7 @@ int LYShowVisitedLinks(char **newfile)
     if (!cur)
 	return (-1);
 
-    if ((fp0 = InternalPageFP(tempfile, TRUE)) == 0)
+    if ((fp0 = InternalPageFP(tempfile, TRUE)) == NULL)
 	return (-1);
 
     LYLocalFileToURL(newfile, tempfile);
@@ -988,7 +988,7 @@ static void to_stack(char *str)
     /*
      * Register string.
      */
-    if (buffstack == 0)
+    if (buffstack == NULL)
 	buffstack = typecallocn(char *, (size_t) status_buf_size);
 
     FREE(buffstack[topOfStack]);
@@ -1016,7 +1016,7 @@ void LYstatusline_messages_on_exit(char **buf)
 {
     int i;
 
-    if (buffstack != 0) {
+    if (buffstack != NULL) {
 	StrAllocCat(*buf, "\n");
 	/* print messages in chronological order:
 	 * probably a single message but let's do it.
@@ -1045,7 +1045,7 @@ void LYstore_message2(const char *message,
     if (message != NULL) {
 	char *temp = NULL;
 
-	HTSprintf0(&temp, message, NonNull(argument));
+	HTSprintf0(&temp, HT_FMT("%s", message), NonNull(argument));
 	to_stack(temp);
     }
 }
@@ -1080,7 +1080,7 @@ static int LYLoadMESSAGES(const char *arg GCC_UNUSED,
     int i;
     char *temp = NULL;
 
-    if (buffstack != 0) {
+    if (buffstack != NULL) {
 	i = status_buf_size;
 	while (--i >= 0) {
 	    if (buffstack[i] != NULL)
@@ -1159,5 +1159,5 @@ static int LYLoadMESSAGES(const char *arg GCC_UNUSED,
 GLOBALDEF(HTProtocol, LYLynxStatusMessages, _LYMESSAGES_C_GLOBALDEF_1_INIT);
 #else
 GLOBALDEF HTProtocol LYLynxStatusMessages =
-{"LYNXMESSAGES", LYLoadMESSAGES, 0};
+{"LYNXMESSAGES", LYLoadMESSAGES, NULL};
 #endif /* GLOBALDEF_IS_MACRO */

@@ -1,5 +1,5 @@
 /*
- * $LynxId: config.hin,v 1.155 2024/03/17 23:09:41 tom Exp $
+ * $LynxId: config.hin,v 1.162 2025/08/03 22:01:04 tom Exp $
  * vile:cmode
  *
  * The configure script translates "config.hin" into "lynx_cfg.h"
@@ -22,12 +22,13 @@
 #undef COPY_PATH		/* CF_PATH_PROG(cp) */
 #undef CURS_PERFORMANCE		/* CF_CURS_PERFORMANCE */
 #undef DEBUG			/* configure --enable-debug */
-#undef DECL_ERRNO
-#undef DECL_GETGRGID
-#undef DECL_GETGRNAM
-#undef DECL_SLEEP
-#undef DECL_STRSTR
-#undef DECL_SYS_ERRLIST
+#undef DECL_ERRNO		/* CF_CHECK_ERRNO */
+#undef DECL_GETGRGID		/* CF_CHECK_FUNCDECLS */
+#undef DECL_GETGRNAM		/* CF_CHECK_FUNCDECLS */
+#undef DECL_SLEEP		/* CF_CHECK_FUNCDECLS */
+#undef DECL_STRSTR		/* CF_CHECK_FUNCDECLS */
+#undef DECL_SYS_ERRLIST		/* CF_SYS_ERRLIST */
+#undef DEFAULT_LOCALE_CHARSET	/* CF_ARG_DISABLE(locale-charset) */
 #undef DIRED_SUPPORT		/* AC_ARG_WITH(dired) */
 #undef DISABLE_BIBP		/* CF_ARG_DISABLE(bibp-urls) */
 #undef DISABLE_FINGER		/* CF_ARG_DISABLE(finger) */
@@ -46,7 +47,6 @@
 #undef EXP_CHINESEUTF8_SUPPORT	/* CF_ARG_ENABLE(chinese-utf8) */
 #undef EXP_KEYBOARD_LAYOUT	/* CF_ARG_ENABLE(kbd-layout) */
 #undef EXP_NESTED_TABLES	/* CF_ARG_ENABLE(nested-tables) */
-#undef EXP_WCWIDTH_SUPPORT	/* CF_ARG_ENABLE(wcwidth-support) */
 #undef FANCY_CURSES		/* CF_FANCY_CURSES */
 #undef GCC_NORETURN		/* CF_GCC_ATTRIBUTES */
 #undef GCC_PRINTF		/* CF_GCC_ATTRIBUTES */
@@ -85,8 +85,9 @@
 #undef HAVE_GETTEXT		/* AM_WITH_NLS */
 #undef HAVE_GETTIMEOFDAY
 #undef HAVE_GETUID
-#undef HAVE_GNUTLS_PROTOCOL_SET_PRIORITY
-#undef HAVE_GNUTLS_RND
+#undef HAVE_GNUTLS_PROTOCOL_SET_ENABLED /* CF_GNUTLS */
+#undef HAVE_GNUTLS_PROTOCOL_SET_PRIORITY /* CF_GNUTLS */
+#undef HAVE_GNUTLS_RND		/* CF_GNUTLS */
 #undef HAVE_H_ERRNO
 #undef HAVE_ICONV		/* AM_ICONV */
 #undef HAVE_INET_ATON		/* CF_INET_ADDR */
@@ -128,6 +129,7 @@
 #undef HAVE_SIGACTION		/* CF_FUNC_SIGACTION */
 #undef HAVE_SIZECHANGE		/* CF_SIZECHANGE */
 #undef HAVE_SLEEP
+#undef HAVE_SSL_CLEAR_OPTIONS	/* CF_SSL */
 #undef HAVE_STDARG_H		/* CF_VARARGS */
 #undef HAVE_STDINT_H		/* AC_CHECK_DECL(exit) */
 #undef HAVE_STDLIB_H		/* AC_CHECK_DECL(exit) */
@@ -186,7 +188,7 @@
 #undef HAVE_ZERROR
 #undef HAVE__NC_FREEALL		/* ncurses debugging extension */
 #undef HAVE__NC_FREE_AND_EXIT	/* ncurses debugging extension */
-#undef ICONV_CONST
+#undef ICONV_CONST		/* AM_ICONV */
 #undef IGNORE_CTRL_C		/* FIXME: make tests? */
 #undef INCLUDE_PROTOTYPES	/* CF_SOCKS5 */
 #undef INSTALL_ARGS		/* CF_PATH_PROG(install) */
@@ -235,6 +237,7 @@
 #undef SIZEOF_TIME_T		/* AC_CHECK_SIZEOF(time_t) */
 #undef SLsmg_Color_Type		/* CF_SLANG_UNIX_DEFS */
 #undef SLtt_Char_Type		/* CF_SLANG_UNIX_DEFS */
+#undef SOCKADDR_LEN_INET	/* CF_SOCKADDR_LEN */
 #undef SOCKS			/* CF_SOCKS, CF_SOCKS5 */
 #undef STDC_HEADERS		/* AC_CHECK_DECL(exit) */
 #undef STDC_NORETURN		/* CF_C11_NORETURN */
@@ -256,7 +259,7 @@
 #undef ULTRIX			/* config.sub */
 #undef UNCOMPRESS_PATH		/* CF_PATH_PROG(gunzip) */
 #undef UNDERLINE_LINKS		/* CF_ARG_ENABLE(underlines) */
-#undef UNIX
+#undef UNIX			/* CF_PDCURSES_X11 */
 #undef UNZIP_PATH		/* CF_PATH_PROG(unzip) */
 #undef USE_ADDRLIST_PAGE	/* CF_ARG_DISABLE(addrlist-page) */
 #undef USE_ALT_BINDINGS		/* CF_ARG_DISABLE(alt-bindings) */
@@ -291,8 +294,10 @@
 #undef USE_SOURCE_CACHE		/* CF_ARG_DISABLE(source-cache) */
 #undef USE_SSL			/* CF_SSL */
 #undef USE_SYSV_UTMP		/* CF_UTMP */
+#undef USE_WCWIDTH_SUPPORT	/* CF_ARG_DISABLE(wcwidth-support) */
 #undef USE_X509_SUPPORT		/* CF_GNUTLS, CF_SSL */
 #undef USE_ZLIB			/* AC_ARG_WITH(zlib) */
+#undef USE_ZSTD			/* AC_ARG_WITH(zstd) */
 #undef UTF8			/* CF_SLANG_CPPFLAGS */
 #undef UTMPX_FOR_UTMP		/* use <utmpx.h> since <utmp.h> not found */
 #undef UUDECODE_PATH		/* CF_PATH_PROG(uudecode) */
@@ -302,6 +307,7 @@
 #undef XCURSES			/* CF_PDCURSES_X11 */
 #undef ZCAT_PATH		/* CF_PATH_PROG(zcat) */
 #undef ZIP_PATH			/* CF_PATH_PROG(zip) */
+#undef ZSTD_PATH		/* CF_PATH_PROG(zstd) */
 #undef _WINDOWS_NSL		/* CF_ARG_ENABLE(nsl-fork) */
 #undef inline			/* AC_C_INLINE */
 #undef intptr_t			/* AC_CHECK_TYPE(intptr_t,...) */

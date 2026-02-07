@@ -1,5 +1,5 @@
 /*
- * $LynxId: HTMLDTD.c,v 1.58 2021/07/23 00:00:03 tom Exp $
+ * $LynxId: HTMLDTD.c,v 1.61 2025/07/25 19:31:24 tom Exp $
  *
  *		Our Static DTD for HTML
  *		-----------------------
@@ -228,11 +228,12 @@ const SGML_dtd HTML_dtd =
    twice... - kw */
 void HTSwitchDTD(int new_flag)
 {
+    assert(sizeof(tags_table1) == sizeof(tags_table0));
     if (TRACE)
 	CTRACE((tfp,
 		"HTMLDTD: Copying %s DTD element info of size %d, %d * %d\n",
 		new_flag ? "strict" : "tagsoup",
-		(int) (new_flag ? sizeof(tags_table1) : sizeof(tags_table0)),
+		(int) sizeof(tags_table0),
 		HTML_ALL_ELEMENTS,
 		(int) sizeof(HTTag)));
     if (new_flag)
@@ -243,7 +244,7 @@ void HTSwitchDTD(int new_flag)
 
 HTTag HTTag_unrecognized =
 
-{NULL_HTTag, NULL, 0, 0, SGML_EMPTY, T__UNREC_, 0, 0};
+{NULL_HTTag, NULL, 0, NULL, SGML_EMPTY, T__UNREC_, 0, 0};
 
 /*
  *	Utility Routine:  Useful for people building HTML objects.
@@ -252,7 +253,7 @@ HTTag HTTag_unrecognized =
 /*	Start anchor element
  *	--------------------
  *
- *	It is kinda convenient to have a particulr routine for
+ *	It is kinda convenient to have a particular routine for
  *	starting an anchor element, as everything else for HTML is
  *	simple anyway.
  */
@@ -280,7 +281,7 @@ void HTStartAnchor(HTStructured * obj, const char *name,
 	value[HTML_A_HREF] = (const char *) href;
     }
 
-    (*obj->isa->start_element) (obj, HTML_A, present, value, -1, 0);
+    (*obj->isa->start_element) (obj, HTML_A, present, value, -1, NULL);
 }
 
 void HTStartAnchor5(HTStructured * obj, const char *name,
@@ -308,7 +309,7 @@ void HTStartAnchor5(HTStructured * obj, const char *name,
 	value[HTML_A_TYPE] = linktype;
     }
 
-    (*obj->isa->start_element) (obj, HTML_A, present, value, tag_charset, 0);
+    (*obj->isa->start_element) (obj, HTML_A, present, value, tag_charset, NULL);
 }
 
 void HTStartIsIndex(HTStructured * obj, const char *prompt,
@@ -330,5 +331,5 @@ void HTStartIsIndex(HTStructured * obj, const char *prompt,
 	value[HTML_ISINDEX_HREF] = (const char *) href;
     }
 
-    (*obj->isa->start_element) (obj, HTML_ISINDEX, present, value, -1, 0);
+    (*obj->isa->start_element) (obj, HTML_ISINDEX, present, value, -1, NULL);
 }

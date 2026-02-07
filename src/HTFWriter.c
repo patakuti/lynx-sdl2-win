@@ -1,5 +1,5 @@
 /*
- * $LynxId: HTFWriter.c,v 1.129 2024/05/27 17:02:24 tom Exp $
+ * $LynxId: HTFWriter.c,v 1.135 2025/06/19 18:51:05 Eric.Lindblad Exp $
  *
  *		FILE WRITER				HTFWrite.h
  *		===========
@@ -47,6 +47,10 @@
 
 #ifdef USE_BROTLI
 #include <brotli/decode.h>
+#endif
+
+#ifdef USE_ZSTD
+# include <zstd.h>
 #endif
 
 /* contains the name of the temp file which is being downloaded into */
@@ -153,14 +157,14 @@ static void decompress_gzip(HTStream *me)
     char copied[LY_MAXPATH];
     FILE *fp = LYOpenTemp(copied, ".tmp.gz", BIN_W);
 
-    if (fp != 0) {
+    if (fp != NULL) {
 #ifdef USE_ZLIB
 	char buffer[BUFSIZ];
 	gzFile gzfp;
 	int status;
 
 	CTRACE((tfp, "decompressing '%s'\n", in_name));
-	if ((gzfp = gzopen(in_name, BIN_R)) != 0) {
+	if ((gzfp = gzopen(in_name, BIN_R)) != NULL) {
 	    BOOL success = TRUE;
 	    size_t actual = 0;
 
@@ -186,7 +190,7 @@ static void decompress_gzip(HTStream *me)
 		(void) LYRemoveTemp(copied);
 	    }
 	}
-#else
+#else /* !USE_ZLIB */
 #define FMT "%s %s"
 	const char *program;
 
@@ -218,7 +222,7 @@ static void decompress_gzip(HTStream *me)
 	    (void) LYRemoveTemp(copied);
 	}
 #undef FMT
-#endif
+#endif /* USE_ZLIB/!USE_ZLIB */
     }
 }
 
@@ -230,7 +234,7 @@ static void decompress_br(HTStream *me)
     char copied[LY_MAXPATH];
     FILE *fp = LYOpenTemp(copied, ".br", BIN_W);
 
-    if (fp != 0) {
+    if (fp != NULL) {
 #ifdef USE_BROTLI
 #define INPUT_BUFFER_SIZE BUFSIZ
 	char *brotli_buffer = NULL;
@@ -296,7 +300,7 @@ static void decompress_br(HTStream *me)
 		     * brotli library should return
 		     *  BROTLI_DECODER_RESULT_NEEDS_MORE_OUTPUT,
 		     * but actually returns
-		     *  BROTLI_DECODER_RESULT_ERROR 
+		     *  BROTLI_DECODER_RESULT_ERROR
 		     *
 		     * Accommodate possible improvements...
 		     */
@@ -362,6 +366,123 @@ static void decompress_br(HTStream *me)
     }
 }
 
+static void decompress_zstd(HTStream *me)	/* XXX too small a buffer; EINTR? */
+{
+    char *in_name = me->anchor->FileCache;
+    char copied[LY_MAXPATH];
+    FILE *ofp = LYOpenTemp(copied, ".tmp.zst", BIN_W);
+
+    if (ofp != NULL) {
+#ifdef USE_ZSTD
+	off_t dsize;
+	FILE *ifp;
+	ZSTD_DStream *izsp;
+	void *ibp, *obp;
+	size_t ibl, obl;
+
+	CTRACE((tfp, "decompressing '%s'\n", in_name));
+
+	ibl = ZSTD_DStreamInSize();
+	ibp = malloc(ibl);
+	if (ibp == NULL)
+	    goto jout0;
+
+	obl = ZSTD_DStreamOutSize();
+	obp = malloc(obl);
+	if (obp == NULL)
+	    goto jout1;
+
+	if ((izsp = ZSTD_createDStream()) == NULL)
+	    goto jout2;
+	ZSTD_initDStream(izsp);
+
+	if ((ifp = fopen(in_name, BIN_R)) == NULL)
+	    goto jout3;
+	CTRACE((tfp, "...opened '%s'\n", copied));
+
+	for (dsize = 0;;) {
+	    ZSTD_inBuffer ib;
+	    size_t r;
+
+	    r = fread(ibp, 1, ibl, ifp);
+	    if (r == 0)
+		break;
+	    ib.src = ibp;
+	    ib.size = r;
+	    ib.pos = 0;
+
+	    do {
+		ZSTD_outBuffer ob;
+		size_t w;
+
+		ob.dst = obp;
+		ob.size = obl;
+		ob.pos = 0;
+		r = ZSTD_decompressStream(izsp, &ob, &ib);
+		if (ZSTD_isError(r))
+		    goto jout4;
+
+		for (w = 0; w < ob.pos;) {
+		    size_t x;
+
+		    x = fwrite(&((char *) obp)[w], 1, ob.pos - w, ofp);
+		    if (x == 0)
+			goto jout4;
+		    w += x;
+		}
+		dsize += (off_t) w;
+	    } while (ib.pos < ib.size);
+	}
+
+	LYCloseTempFP(ofp);
+	CTRACE((tfp, "...decompress %" PRI_off_t " to %" PRI_off_t "\n",
+		CAST_off_t (me->anchor->actual_length), CAST_off_t (dsize)));
+	if (LYRenameFile(copied, in_name) == 0)
+	    me->anchor->actual_length = dsize;
+	(void) LYRemoveTemp(copied);
+
+      jout4:fclose(ifp);
+      jout3:ZSTD_freeDStream(izsp);
+      jout2:free(obp);
+      jout1:free(ibp);
+      jout0:;
+
+#else
+# define FMT "%s -d --rm %s"
+	const char *program;
+
+	if ((program = HTGetProgramPath(ppZSTD)) == NULL) {
+	    HTAlert(ERROR_UNCOMPRESSING_TEMP);
+	} else if (LYCopyFile(in_name, copied) == 0) {
+	    char expanded[LY_MAXPATH];
+	    char *command = NULL;
+
+	    HTAddParam(&command, FMT, 1, program);
+	    HTAddParam(&command, FMT, 2, copied);
+	    HTEndParam(&command, FMT, 2);
+	    if (LYSystem(command) == 0) {
+		struct stat stat_buf;
+
+		strcpy(expanded, copied);
+		*strrchr(expanded, '.') = '\0';
+		if (LYRenameFile(expanded, in_name) != 0) {
+		    CTRACE((tfp, "rename failed %s to %s\n", expanded, in_name));
+		} else if (stat(in_name, &stat_buf) != 0) {
+		    CTRACE((tfp, "stat failed for %s\n", in_name));
+		} else {
+		    me->anchor->actual_length = stat_buf.st_size;
+		}
+	    } else {
+		CTRACE((tfp, "command failed: %s\n", command));
+	    }
+	    free(command);
+	    (void) LYRemoveTemp(copied);
+	}
+# undef FMT
+#endif
+    }
+}
+
 /*	Free an HTML object
  *	-------------------
  *
@@ -388,7 +509,7 @@ static void HTFWriter_free(HTStream *me)
     if (me->end_command) {	/* Temp file */
 	LYCloseTempFP(me->fp);
 	/*
-	 * Handle a special case where the server used "Content-Type:  gzip". 
+	 * Handle a special case where the server used "Content-Type:  gzip".
 	 * Normally that feeds into the presentation stages, but if the link
 	 * happens to point to something that will not be presented, but
 	 * instead offered as a download, it comes here.  In that case, ungzip
@@ -404,6 +525,11 @@ static void HTFWriter_free(HTStream *me)
 		   && IsCompressionFormat(me->input_format, cftBrotli)
 		   && !strcmp(me->anchor->content_encoding, "br")) {
 	    decompress_br(me);
+	} else if (me->anchor->FileCache != NULL
+		   && me->anchor->no_content_encoding == FALSE
+		   && IsCompressionFormat(me->input_format, cftZstd)
+		   && !strcmp(me->anchor->content_encoding, "zstd")) {
+	    decompress_zstd(me);
 	}
 #ifdef VMS
 	else if (0 == strcmp(me->end_command, "SaveVMSBinaryFile")) {
@@ -467,6 +593,16 @@ static void HTFWriter_free(HTStream *me)
 #endif /* USE_BROTLI */
 		    {
 			path[len - 3] = '\0';
+			(void) remove(path);
+		    }
+		} else if (len > 4 && !strcasecomp(&path[len - 3], "zst")) {
+#ifdef USE_ZSTD
+		    if (!skip_loadfile) {
+			use_zread = YES;
+		    } else
+#endif /* USE_ZSTD */
+		    {
+			path[len - 4] = '\0';
 			(void) remove(path);
 		    }
 		} else if (len > 2 && !strcasecomp(&path[len - 1], "Z")) {
@@ -581,7 +717,7 @@ static void HTFWriter_free(HTStream *me)
 			 * copy the temp file to another temp file (or even the
 			 * same!).  We can skip this needless duplication by
 			 * using the viewer_command which has already been
-			 * determined when the HTCompressed stream was created. 
+			 * determined when the HTCompressed stream was created.
 			 * - kw
 			 */
 			FREE(me->end_command);
@@ -804,13 +940,14 @@ static char *mailcap_substitute(HTParentAnchor *anchor,
 				char *fnam)
 {
     char *result = LYMakeMailcapCommand(pres->command,
+					HTAtom_name(pres->rep),
 					anchor->content_type_params,
 					fnam);
 
 #if defined(UNIX)
     /* if we don't have a "%s" token, expect to provide the file via stdin */
     if (!LYMailcapUsesPctS(pres->command)) {
-	char *prepend = 0;
+	char *prepend = NULL;
 	const char *format = "( %s ) < %s";
 
 	HTSprintf(&prepend, "( %s", result);	/* ...avoid quoting */
@@ -825,7 +962,7 @@ static char *mailcap_substitute(HTParentAnchor *anchor,
 /*	Take action using a system command
  *	----------------------------------
  *
- *	originally from Ghostview handling by Marc Andreseen.
+ *	originally from Ghostview handling by Marc Andreessen.
  *	Creates temporary file, writes to it, executes system command
  *	on end-document.  The suffix of the temp file can be given
  *	in case the application is fussy, or so that a generic opener can
@@ -860,7 +997,7 @@ HTStream *HTSaveAndExecute(HTPresentation *pres,
 		/* allow it to continue */
 		;
 	    } else {
-		char *buf = 0;
+		char *buf = NULL;
 
 		HTSprintf0(&buf, EXECUTION_DISABLED_FOR_FILE,
 			   key_for_func(LYK_OPTIONS));
@@ -946,7 +1083,7 @@ HTStream *HTSaveAndExecute(HTPresentation *pres,
 	} else if (!strncasecomp(pres->rep->name, "text/", 5)) {
 	    suffix = TEXT_SUFFIX;
 	} else if ((suffix = HTFileSuffix(pres->rep,
-					  anchor->content_encoding)) == 0
+					  anchor->content_encoding)) == NULL
 		   || *suffix != '.') {
 	    if (!strncasecomp(pres->rep->name, "application/", 12)) {
 		suffix = BIN_SUFFIX;
@@ -991,7 +1128,7 @@ HTStream *HTSaveAndExecute(HTPresentation *pres,
  *
  *	usually a binary file that can't be displayed
  *
- *	originally from Ghostview handling by Marc Andreseen.
+ *	originally from Ghostview handling by Marc Andreessen.
  *	Asks the user if he wants to continue, creates a temporary
  *	file, and writes to it.  In HTSaveToFile_Free
  *	the user will see a list of choices for download
@@ -1102,7 +1239,7 @@ HTStream *HTSaveToFile(HTPresentation *pres,
 	} else if (!strncasecomp(pres->rep->name, "application/", 12)) {
 	    suffix = BIN_SUFFIX;
 	} else if ((suffix = HTFileSuffix(pres->rep,
-					  anchor->content_encoding)) == 0
+					  anchor->content_encoding)) == NULL
 		   || *suffix != '.') {
 	    suffix = HTML_SUFFIX;
 	}
@@ -1277,7 +1414,7 @@ HTStream *HTCompressed(HTPresentation *pres,
 	     * end of the list, and unless the quality is lower, we prefer
 	     * those.
 	     */
-	    if (Pres == 0)
+	    if (Pres == NULL)
 		Pres = Pnow;
 	    else if (Pres->quality > Pnow->quality)
 		continue;
@@ -1320,6 +1457,13 @@ HTStream *HTCompressed(HTPresentation *pres,
 		    StrAllocCopy(uncompress_mask, program);
 		    StrAllocCat(uncompress_mask, " -j -d %s");
 		    compress_suffix = "br";
+		}
+		break;
+	    case cftZstd:
+		if ((program = HTGetProgramPath(ppZSTD)) != NULL) {
+		    StrAllocCopy(uncompress_mask, program);
+		    StrAllocCat(uncompress_mask, " --rm -d %s");
+		    compress_suffix = "zst";
 		}
 		break;
 	    case cftCompress:
@@ -1499,6 +1643,20 @@ HTStream *HTCompressed(HTPresentation *pres,
 	StrAllocCopy(me->end_command, "");
     } else
 #endif /* USE_ZLIB */
+#ifdef USE_ZSTD
+	if (compress_suffix[0] == 'z'	/* must be gzip */
+	    && compress_suffix[1] == 's'
+	    && compress_suffix[2] == 't'
+	    && compress_suffix[3] == '\0'
+	    && !me->viewer_command) {
+	/*
+	 * We won't call gzip or compress externally, so we don't need to
+	 * supply a command for it.
+	 */
+	StrAllocCopy(me->end_command, "");
+    } else
+#endif /* USE_ZSTD */
+
     {
 	me->end_command = NULL;
 	HTAddParam(&(me->end_command), uncompress_mask, 1, fnam);

@@ -1,5 +1,5 @@
 /*
- * $LynxId: HTFile.c,v 1.165 2024/05/28 00:35:41 tom Exp $
+ * $LynxId: HTFile.c,v 1.169 2025/01/07 15:18:17 tom Exp $
  *
  *			File Access				HTFile.c
  *			===========
@@ -115,8 +115,8 @@ typedef struct {
 
 #define PUTC(c)      (*target->isa->put_character)(target, c)
 #define PUTS(s)      (*target->isa->put_string)(target, s)
-#define START(e)     (*target->isa->start_element)(target, e, 0, 0, -1, 0)
-#define END(e)       (*target->isa->end_element)(target, e, 0)
+#define START(e)     (*target->isa->start_element)(target, e, NULL, NULL, -1, NULL)
+#define END(e)       (*target->isa->end_element)(target, e, NULL)
 #define MAYBE_END(e) if (HTML_dtd.tags[e].contents != SGML_EMPTY) \
 			(*target->isa->end_element)(target, e, 0)
 #define FREE_TARGET  (*target->isa->_free)(target)
@@ -154,7 +154,7 @@ static char s_unknown_suffix[] = "*.*";
 /*
  *  Suffix registration.
  */
-static HTList *HTSuffixes = 0;
+static HTList *HTSuffixes = NULL;
 
 static HTSuffix no_suffix =
 {
@@ -184,7 +184,7 @@ static char *FormatStr(char **bufp,
 
     if (*start) {
 	sprintf(fmt, "%%%.*ss", (int) sizeof(fmt) - 3, start);
-	HTSprintf0(bufp, fmt, entry);
+	HTSprintf0(bufp, HT_FMT("%s", fmt), entry);
     } else if (*bufp && !(entry && *entry)) {
 	**bufp = '\0';
     } else if (entry) {
@@ -203,7 +203,7 @@ static char *FormatSize(char **bufp,
 	sprintf(fmt, "%%%.*s" PRI_off_t,
 		  (int) sizeof(fmt) - DigitsOf(start) - 3, start);
 
-	HTSprintf0(bufp, fmt, entry);
+	HTSprintf0(bufp, HT_FMT("%" PRI_off_t, fmt), entry);
     } else {
 	sprintf(fmt, "%" PRI_off_t, CAST_off_t (entry));
 
@@ -220,7 +220,7 @@ static char *FormatNum(char **bufp,
 
     if (*start) {
 	sprintf(fmt, "%%%.*sd", (int) sizeof(fmt) - 3, start);
-	HTSprintf0(bufp, fmt, entry);
+	HTSprintf0(bufp, HT_FMT("%d", fmt), entry);
     } else {
 	sprintf(fmt, "%d", entry);
 	StrAllocCopy(*bufp, fmt);
@@ -266,10 +266,10 @@ static void LYListFmtParse(const char *fmtstr,
 #else
     static const char *pbits[] =
     {"---", "--x", "-w-", "-wx",
-     "r--", "r-x", "rw-", "rwx", 0};
+     "r--", "r-x", "rw-", "rwx", NULL};
     static const char *psbits[] =
     {"--S", "--s", "-wS", "-ws",
-     "r-S", "r-s", "rwS", "rws", 0};
+     "r-S", "r-s", "rwS", "rws", NULL};
 
 #define PBIT(a, n, s)  (s) ? psbits[((a) >> (n)) & 0x7] : \
 	pbits[((a) >> (n)) & 0x7]
@@ -277,7 +277,7 @@ static void LYListFmtParse(const char *fmtstr,
 #if defined(S_ISVTX) && !defined(_WINDOWS)
     static const char *ptbits[] =
     {"--T", "--t", "-wT", "-wt",
-     "r-T", "r-t", "rwT", "rwt", 0};
+     "r-T", "r-t", "rwT", "rwt", NULL};
 
 #define PTBIT(a, s)  (s) ? ptbits[(a) & 0x7] : pbits[(a) & 0x7]
 #else
@@ -370,7 +370,7 @@ static void LYListFmtParse(const char *fmtstr,
 	    break;
 
 	case 'd':		/* date */
-	    now = time(0);
+	    now = time(NULL);
 	    datestr = ctime(&data->file_info.st_mtime);
 	    if ((now - data->file_info.st_mtime) < SEC_PER_YEAR / 2)
 		/*
@@ -891,7 +891,7 @@ HTFormat HTFileFormat(const char *filename,
 
     VMS_DEL_VERSION(filename);
 
-    if ((search = FindSearch(filename)) != 0) {
+    if ((search = FindSearch(filename)) != NULL) {
 	char *newname = NULL;
 	HTFormat result;
 
@@ -992,7 +992,7 @@ HTFormat HTCharsetFormat(HTFormat format,
     const char *format_name = format->name;
 
     FREE(anchor->charset);
-    if (format_name == 0)
+    if (format_name == NULL)
 	format_name = "";
     StrAllocCopy(cp, format_name);
     LYLowerCase(cp);
@@ -1258,7 +1258,7 @@ CompressFileType HTCompressFileType(const char *filename,
     CompressFileType result = cftNone;
     char *search;
 
-    if ((search = FindSearch(filename)) != 0) {
+    if ((search = FindSearch(filename)) != NULL) {
 	char *newname = NULL;
 
 	StrAllocCopy(newname, filename);
@@ -1275,27 +1275,32 @@ CompressFileType HTCompressFileType(const char *filename,
 
 	if ((len > 3)
 	    && !strcasecomp((ftype - 2), "br")
-	    && StrChr(dots, ftype[-3]) != 0) {
+	    && StrChr(dots, ftype[-3]) != NULL) {
 	    result = cftBrotli;
 	    ftype -= 3;
 	} else if ((len > 4)
 		   && !strcasecomp((ftype - 3), "bz2")
-		   && StrChr(dots, ftype[-4]) != 0) {
+		   && StrChr(dots, ftype[-4]) != NULL) {
 	    result = cftBzip2;
+	    ftype -= 4;
+	} else if ((len > 4)
+		   && !strcasecomp((ftype - 3), "zst")
+		   && StrChr(dots, ftype[-4]) != NULL) {
+	    result = cftZstd;
 	    ftype -= 4;
 	} else if ((len > 3)
 		   && !strcasecomp((ftype - 2), "gz")
-		   && StrChr(dots, ftype[-3]) != 0) {
+		   && StrChr(dots, ftype[-3]) != NULL) {
 	    result = cftGzip;
 	    ftype -= 3;
 	} else if ((len > 3)
 		   && !strcasecomp((ftype - 2), "zz")
-		   && StrChr(dots, ftype[-3]) != 0) {
+		   && StrChr(dots, ftype[-3]) != NULL) {
 	    result = cftDeflate;
 	    ftype -= 3;
 	} else if ((len > 2)
 		   && !strcmp((ftype - 1), "Z")
-		   && StrChr(dots, ftype[-2]) != 0) {
+		   && StrChr(dots, ftype[-2]) != NULL) {
 	    result = cftCompress;
 	    ftype -= 2;
 	}
@@ -1335,6 +1340,9 @@ const char *HTCompressTypeToSuffix(CompressFileType method)
     case cftBrotli:
 	result = ".br";
 	break;
+    case cftZstd:
+	result = ".zst";
+	break;
     }
     return result;
 }
@@ -1366,6 +1374,9 @@ const char *HTCompressTypeToEncoding(CompressFileType method)
     case cftBrotli:
 	result = "brotli";
 	break;
+    case cftZstd:
+	result = "zstd";
+	break;
     }
     return result;
 }
@@ -1377,6 +1388,7 @@ const char *HTCompressTypeToEncoding(CompressFileType method)
  *	compress
  *	deflate
  * as well as "identity" (but that does nothing).
+ * RFC 8878 gives zstd.
  */
 CompressFileType HTEncodingToCompressType(const char *coding)
 {
@@ -1400,6 +1412,8 @@ CompressFileType HTEncodingToCompressType(const char *coding)
 	       !strcasecomp(coding, "x-br") ||
 	       !strcasecomp(coding, "brotli")) {	/* expected */
 	result = cftBrotli;
+    } else if (!strcasecomp(coding, "zstd")) {
+	result = cftZstd;
     }
     return result;
 }
@@ -1426,6 +1440,8 @@ CompressFileType HTContentTypeToCompressType(const char *ct)
 	       !strncasecomp(ct, "application/x-br", 16) ||
 	       !strncasecomp(ct, "application/brotli", 18)) {
 	method = cftBrotli;
+    } else if (!strncasecomp(ct, "application/zstd", 16)) {
+	method = cftZstd;
     }
     return method;
 }
@@ -1459,6 +1475,9 @@ BOOL IsCompressionFormat(HTAtom *format, CompressFileType check)
 		  format == HTAtom_for("application/x-br") ||
 		  format == HTAtom_for("application/brotli"));
 	break;
+    case cftZstd:
+	result = (format == HTAtom_for("application/zstd"));
+	break;
     case cftNone:
 	break;
     }
@@ -1475,9 +1494,9 @@ CompressFileType HTContentToCompressType(HTParentAnchor *anchor)
     const char *ct = HTAnchor_content_type(anchor);
     const char *ce = HTAnchor_content_encoding(anchor);
 
-    if (ct != 0) {
+    if (ct != NULL) {
 	method = HTContentTypeToCompressType(ct);
-    } else if (ce != 0) {
+    } else if (ce != NULL) {
 	method = HTEncodingToCompressType(ce);
     }
     return method;
@@ -1595,7 +1614,7 @@ void HTDirEntry(HTStructured * target, const char *tail, const char *entry)
 	/*
 	 * If empty tail, gives absolute ref below.
 	 */
-	relative = 0;
+	relative = NULL;
 	HTSprintf0(&relative, "%s%s%s",
 		   tail,
 		   (*escaped != '\0' ? "/" : ""),
@@ -1783,7 +1802,7 @@ BOOL HTDirTitles(HTStructured * target, HTParentAnchor *anchor,
 	    return (need_parent_link);
 	}
 
-	relative = 0;
+	relative = NULL;
 	HTSprintf0(&relative, "%s/..", current);
 
 #if defined(DOSPATH) || defined(__EMX__)
@@ -2486,19 +2505,23 @@ static int decompressAndParse(HTParentAnchor *anchor,
 			      HTFormat format,
 			      int *statusp)
 {
-    HTAtom *encoding = 0;
+    HTAtom *encoding = NULL;
 
 #ifdef USE_ZLIB
-    FILE *zzfp = 0;
-    gzFile gzfp = 0;
+    FILE *zzfp = NULL;
+    gzFile gzfp = NULL;
 #endif /* USE_ZLIB */
 #ifdef USE_BZLIB
-    BZFILE *bzfp = 0;
+    BZFILE *bzfp = NULL;
 #endif /* USE_BZLIB */
 #ifdef USE_BROTLI
-    FILE *brfp = 0;
+    FILE *brfp = NULL;
 #endif /* USE_BROTLI */
-#if defined(USE_ZLIB) || defined(USE_BZLIB)
+#ifdef USE_ZSTD
+    FILE *zfp = NULL;
+#endif
+#if defined(USE_ZLIB) || defined(USE_BZLIB) ||\
+	defined(USE_BROTLI) || defined(USE_ZSTD)
     CompressFileType internal_decompress = cftNone;
     BOOL failed_decompress = NO;
 #endif
@@ -2556,7 +2579,8 @@ static int decompressAndParse(HTParentAnchor *anchor,
 	     * this is a compressed file, no need to look at the filename
 	     * again.  - kw
 	     */
-#if defined(USE_ZLIB) || defined(USE_BZLIB)
+#if defined(USE_ZLIB) || defined(USE_BZLIB) ||\
+		defined(USE_BROTLI) || defined(USE_ZSTD)
 	    CompressFileType method = HTEncodingToCompressType(HTAtom_name(myEncoding));
 #endif
 
@@ -2565,7 +2589,7 @@ static int decompressAndParse(HTParentAnchor *anchor,
 	    if (isDOWNLOAD(cftGzip)) {
 		if (isGzipStream(fp)) {
 		    fclose(fp);
-		    fp = 0;
+		    fp = NULL;
 		    gzfp = gzopen(localname, BIN_R);
 
 		    CTRACE((tfp, "HTLoadFile: gzopen of `%s' gives %p\n",
@@ -2575,7 +2599,7 @@ static int decompressAndParse(HTParentAnchor *anchor,
 	    } else if (isDOWNLOAD(cftDeflate)) {
 		if (isDeflateStream(fp)) {
 		    zzfp = fp;
-		    fp = 0;
+		    fp = NULL;
 
 		    CTRACE((tfp, "HTLoadFile: zzopen of `%s' gives %p\n",
 			    localname, (void *) zzfp));
@@ -2587,7 +2611,7 @@ static int decompressAndParse(HTParentAnchor *anchor,
 	    if (isDOWNLOAD(cftBzip2)) {
 		if (isBzip2Stream(fp)) {
 		    fclose(fp);
-		    fp = 0;
+		    fp = NULL;
 		    bzfp = BZ2_bzopen(localname, BIN_R);
 
 		    CTRACE((tfp, "HTLoadFile: bzopen of `%s' gives %p\n",
@@ -2599,7 +2623,7 @@ static int decompressAndParse(HTParentAnchor *anchor,
 #ifdef USE_BROTLI
 	    if (isDOWNLOAD(cftBrotli)) {
 		fclose(fp);
-		fp = 0;
+		fp = NULL;
 		brfp = brotli_open(localname, BIN_R);
 
 		CTRACE((tfp, "HTLoadFile: brotli_open of `%s' gives %p\n",
@@ -2607,6 +2631,16 @@ static int decompressAndParse(HTParentAnchor *anchor,
 		internal_decompress = cftBrotli;
 	    } else
 #endif /* USE_BROTLI */
+#ifdef USE_ZSTD
+	    if (isDOWNLOAD(cftZstd)) {
+		fclose(fp);
+		fp = NULL;
+		zfp = fopen(localname, BIN_R);
+		CTRACE((tfp, "HTLoadFile: fopen of `%s' gives %p\n",
+			localname, (void *) zfp));
+		internal_decompress = cftZstd;
+	    } else
+#endif /* USE_ZSTD */
 	    {
 		StrAllocCopy(anchor->content_type, format->name);
 		StrAllocCopy(anchor->content_encoding, HTAtom_name(myEncoding));
@@ -2638,7 +2672,7 @@ static int decompressAndParse(HTParentAnchor *anchor,
 		if (strcmp(format_out->name, STR_DOWNLOAD) != 0) {
 		    if (isDeflateStream(fp)) {
 			zzfp = fp;
-			fp = 0;
+			fp = NULL;
 
 			CTRACE((tfp, "HTLoadFile: zzopen of `%s' gives %p\n",
 				localname, (void *) zzfp));
@@ -2655,7 +2689,7 @@ static int decompressAndParse(HTParentAnchor *anchor,
 		if (strcmp(format_out->name, STR_DOWNLOAD) != 0) {
 		    if (isGzipStream(fp)) {
 			fclose(fp);
-			fp = 0;
+			fp = NULL;
 			gzfp = gzopen(localname, BIN_R);
 
 			CTRACE((tfp, "HTLoadFile: gzopen of `%s' gives %p\n",
@@ -2673,7 +2707,7 @@ static int decompressAndParse(HTParentAnchor *anchor,
 		if (strcmp(format_out->name, STR_DOWNLOAD) != 0) {
 		    if (isBzip2Stream(fp)) {
 			fclose(fp);
-			fp = 0;
+			fp = NULL;
 			bzfp = BZ2_bzopen(localname, BIN_R);
 
 			CTRACE((tfp, "HTLoadFile: bzopen of `%s' gives %p\n",
@@ -2690,7 +2724,7 @@ static int decompressAndParse(HTParentAnchor *anchor,
 #ifdef USE_BROTLI
 		if (strcmp(format_out->name, STR_DOWNLOAD) != 0) {
 		    fclose(fp);
-		    fp = 0;
+		    fp = NULL;
 		    brfp = brotli_open(localname, BIN_R);
 
 		    CTRACE((tfp, "HTLoadFile: brotli_open of `%s' gives %p\n",
@@ -2700,6 +2734,21 @@ static int decompressAndParse(HTParentAnchor *anchor,
 #else /* USE_BROTLI */
 		format = HTAtom_for("www/compressed");
 #endif /* USE_BROTLI */
+		break;
+	    case cftZstd:
+		StrAllocCopy(anchor->content_encoding, "zstd");
+#ifdef USE_ZSTD
+		if (strcmp(format_out->name, STR_DOWNLOAD) != 0) {
+		    fclose(fp);
+		    fp = NULL;
+		    zfp = fopen(localname, BIN_R);
+		    CTRACE((tfp, "HTLoadFile: fopen of `%s' gives %p\n",
+			    localname, (void *) zfp));
+		    internal_decompress = cftZstd;
+		}
+#else /* USE_ZSTD */
+		format = HTAtom_for("www/compressed");
+#endif /* USE_ZSTD */
 		break;
 	    case cftNone:
 		break;
@@ -2725,6 +2774,11 @@ static int decompressAndParse(HTParentAnchor *anchor,
 #ifdef USE_BROTLI
 	    case cftBrotli:
 		failed_decompress = (BOOLEAN) (brfp == NULL);
+		break;
+#endif
+#ifdef USE_ZSTD
+	    case cftZstd:
+		failed_decompress = (BOOLEAN) (zfp == NULL);
 		break;
 #endif
 	    default:
@@ -2758,6 +2812,12 @@ static int decompressAndParse(HTParentAnchor *anchor,
 		if (sugfname && *sugfname)
 		    StrAllocCopy(anchor->SugFname, sugfname);
 		FREE(sugfname);
+#ifdef USE_ZSTD
+		if (zfp)
+		    *statusp = HTParseZstdFile(format, format_out,
+					       anchor,
+					       zfp, sink);
+#endif
 #ifdef USE_BROTLI
 		if (brfp)
 		    *statusp = HTParseBrFile(format, format_out,
@@ -2786,9 +2846,9 @@ static int decompressAndParse(HTParentAnchor *anchor,
 	{
 	    *statusp = HTParseFile(format, format_out, anchor, fp, sink);
 	}
-	if (fp != 0) {
+	if (fp != NULL) {
 	    fclose(fp);
-	    fp = 0;
+	    fp = NULL;
 	}
 	result = TRUE;
     }				/* If successful open */
@@ -2979,7 +3039,7 @@ int HTLoadFile(const char *addr,
 	if ((strlen(localname) > strlen(MULTI_SUFFIX)) &&
 	    (0 == strcmp(localname + strlen(localname) - strlen(MULTI_SUFFIX),
 			 MULTI_SUFFIX))) {
-	    DIR *dp = 0;
+	    DIR *dp = NULL;
 	    BOOL forget_multi = NO;
 
 	    STRUCT_DIRENT *dirbuf;
@@ -3054,6 +3114,9 @@ int HTLoadFile(const char *addr,
 			    break;
 			case cftBrotli:
 			    atomname = "application/x-brotli";
+			    break;
+			case cftZstd:
+			    atomname = "application/zstd";
 			    break;
 			case cftNone:
 			    break;
@@ -3340,7 +3403,7 @@ const char *HTGetProgramPath(ProgramPaths code)
 void HTSetProgramPath(ProgramPaths code, const char *path)
 {
     if (code > ppUnknown && code < pp_Last) {
-	program_paths[code] = isEmpty(path) ? 0 : path;
+	program_paths[code] = isEmpty(path) ? NULL : path;
     }
 }
 
@@ -3356,6 +3419,11 @@ void HTInitProgramPaths(BOOL init)
 
     for (n = (int) ppUnknown + 1; n < (int) pp_Last; ++n) {
 	switch (code = (ProgramPaths) n) {
+#ifdef ZSTD_PATH
+	case ppZSTD:
+	    path = ZSTD_PATH;
+	    break;
+#endif
 #ifdef BROTLI_PATH
 	case ppBROTLI:
 	    path = BROTLI_PATH;
@@ -3500,7 +3568,7 @@ GLOBALDEF(HTProtocol, HTFTP, _HTFILE_C_1_INIT);
 GLOBALDEF(HTProtocol, HTFile, _HTFILE_C_2_INIT);
 #else
 GLOBALDEF HTProtocol HTFTP =
-{"ftp", HTLoadFile, 0};
+{"ftp", HTLoadFile, NULL};
 GLOBALDEF HTProtocol HTFile =
 {"file", HTLoadFile, HTFileSaveStream};
 #endif /* GLOBALDEF_IS_MACRO */

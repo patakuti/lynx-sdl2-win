@@ -1,5 +1,5 @@
 /*
- * $LynxId: LYBookmark.c,v 1.92 2024/03/21 07:34:18 tom Exp $
+ * $LynxId: LYBookmark.c,v 1.96 2025/09/17 22:38:25 tom Exp $
  */
 #include <HTUtils.h>
 #include <HTAlert.h>
@@ -46,7 +46,7 @@ int LYMBM2index(int ch)
 	const char *letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 	const char *result = StrChr(letters, ch);
 
-	if (result != 0
+	if (result != NULL
 	    && (result - letters) <= MBM_V_MAXFILES)
 	    return (int) (result - letters);
     }
@@ -55,7 +55,7 @@ int LYMBM2index(int ch)
 
 static void show_bookmark_not_defined(void)
 {
-    char *string_buffer = 0;
+    char *string_buffer = NULL;
 
     HTSprintf0(&string_buffer,
 	       BOOKMARK_FILE_NOT_DEFINED,
@@ -78,7 +78,7 @@ static void show_bookmark_not_defined(void)
 const char *get_bookmark_filename(char **URL)
 {
     static char filename_buffer[LY_MAXPATH];
-    char *string_buffer = 0;
+    char *string_buffer = NULL;
     FILE *fp;
     int MBM_tmp;
 
@@ -122,7 +122,7 @@ const char *get_bookmark_filename(char **URL)
 	 * We now have the file open.
 	 * Check if it is a mosaic hotlist.
 	 */
-	if (LYSafeGets(&string_buffer, fp) != 0
+	if (LYSafeGets(&string_buffer, fp) != NULL
 	    && *LYTrimNewline(string_buffer) != '\0'
 	    && !StrNCmp(string_buffer, "ncsa-xmosaic-hotlist-format-1", 29)) {
 	    const char *newname;
@@ -168,7 +168,7 @@ static const char *convert_mosaic_bookmark_file(const char *filename_buffer)
 	return ("");		/* should always open */
 
     fprintf(nfp, "<head>\n<title>%s</title>\n</head>\n", MOSAIC_BOOKMARK_TITLE);
-    fprintf(nfp, "%s\n\n<p>\n<ol>\n", gettext("\
+    fprintf(nfp, "%s\n\n<p>\n<ol>\n", LY_MSG("\
      This file is an HTML representation of the X Mosaic hotlist file.\n\
      Outdated or invalid links may be removed by using the\n\
      remove bookmark command, it is usually the 'R' key but may have\n\
@@ -418,7 +418,7 @@ void save_bookmark_link(const char *address,
     }
 
     /*
-     * If the link will be added to the same bookmark file, get confirmation. 
+     * If the link will be added to the same bookmark file, get confirmation.
      * - FM
      */
     if (LYMultiBookmarks != MBM_OFF) {
@@ -484,7 +484,7 @@ void save_bookmark_link(const char *address,
 	have8bit(Title) && (!LYHaveCJKCharacterSet)) {
 	char *p = title_convert8bit(Title);
 
-	if (p != 0) {
+	if (p != NULL) {
 	    FREE(Title);
 	    Title = p;
 	}
@@ -663,7 +663,7 @@ void save_bookmark_link(const char *address,
 	fprintf(fp, "<body>\n");
 #ifdef _WINDOWS
 	fprintf(fp, "<p>%s",
-		gettext("     You can delete links by the 'R' key<br>\n<ol>\n"));
+		LY_MSG("     You can delete links by the 'R' key<br>\n<ol>\n"));
 #else
 	fprintf(fp, "<p>%s<br>\n%s\n\n<!--\n%s\n--></p>\n\n<ol>\n",
 		gettext("\
@@ -781,7 +781,7 @@ void remove_bookmark_link(int cur,
     }
 
     LYAddPathToHome(homepath, sizeof(homepath), "");
-    if ((nfp = LYOpenScratch(newfile, homepath)) == 0) {
+    if ((nfp = LYOpenScratch(newfile, homepath)) == NULL) {
 	LYCloseInput(fp);
 	HTAlert(BOOKSCRA_OPEN_FAILED_FOR_DEL);
 	return;
@@ -930,7 +930,7 @@ void remove_bookmark_link(int cur,
 #else
 	if (errno == EXDEV) {
 	    static const char MV_FMT[] = "%s %s %s";
-	    char *buffer = 0;
+	    char *buffer = NULL;
 	    const char *program;
 
 	    if ((program = HTGetProgramPath(ppMV)) != NULL) {
@@ -972,7 +972,7 @@ void remove_bookmark_link(int cur,
     if (fp != NULL)
 	LYCloseInput(fp);
     if (keep_tempfile) {
-	HTUserMsg2(gettext("File may be recoverable from %s during this session"),
+	HTUserMsg2(LY_MSG("File may be recoverable from %s during this session"),
 		   newfile);
     } else {
 	(void) LYRemoveTemp(newfile);
@@ -1128,7 +1128,7 @@ int select_menu_multi_bookmarks(void)
 	LYmove(1, 5);
 	lynx_start_h1_color();
 	if (MBM_screens > 1) {
-	    char *shead_buffer = 0;
+	    char *shead_buffer = NULL;
 
 	    HTSprintf0(&shead_buffer,
 		       MULTIBOOKMARKS_SHEAD_MASK, MBM_current, MBM_screens);
@@ -1300,7 +1300,7 @@ static BOOLEAN havevisible(const char *Title)
 	}
 	if (unicode <= 32 || unicode == 0xa0 || unicode == 0xad)
 	    continue;
-	if (unicode < 0x2000 || unicode >= 0x200f) {
+	if (!is_ucs_spacing(unicode) && !is_ucs_zero_width(unicode)) {
 	    result = TRUE;
 	    break;
 	}
@@ -1407,7 +1407,7 @@ static char *title_convert8bit(const char *Title)
  */
 void set_default_bookmark_page(char *value)
 {
-    if (value != 0) {
+    if (value != NULL) {
 	if (bookmark_page == NULL
 	    || strcmp(bookmark_page, value)) {
 	    StrAllocCopy(bookmark_page, value);

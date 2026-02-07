@@ -1,5 +1,5 @@
 /*
- * $LynxId: HTGopher.c,v 1.77 2022/04/01 00:18:09 tom Exp $
+ * $LynxId: HTGopher.c,v 1.80 2025/01/07 15:25:47 tom Exp $
  *
  *			GOPHER ACCESS				HTGopher.c
  *			=============
@@ -80,8 +80,8 @@
 
 #define PUTC(c) (*targetClass.put_character)(target, c)
 #define PUTS(s) (*targetClass.put_string)(target, s)
-#define START(e) (*targetClass.start_element)(target, e, 0, 0, -1, 0)
-#define END(e) (*targetClass.end_element)(target, e, 0)
+#define START(e) (*targetClass.start_element)(target, e, NULL, NULL, -1, NULL)
+#define END(e) (*targetClass.end_element)(target, e, NULL)
 #define FREE_TARGET (*targetClass._free)(target)
 
 #define NEXT_CHAR HTGetCharacter()
@@ -208,7 +208,7 @@ static void write_anchor(const char *text, const char *addr)
 
     HT_Is_Gopher_URL = TRUE;	/* tell HTML.c that this is a Gopher URL */
     (*targetClass.start_element) (target, HTML_A, present,
-				  (const char **) value, -1, 0);
+				  (const char **) value, -1, NULL);
 
     PUTS(text);
     END(HTML_A);
@@ -304,7 +304,7 @@ static void parse_menu(const char *arg GCC_UNUSED,
 	    *p++ = '\0';	/* Terminate line */
 	    bytes += (int) (p - line);	/* add size */
 	    p = line;		/* Scan it to parse it */
-	    port = 0;		/* Flag "not parsed" */
+	    port = NULL;	/* Flag "not parsed" */
 	    CTRACE((tfp, "HTGopher: Menu item: %s\n", line));
 	    gtype = *p++;
 
@@ -372,19 +372,20 @@ static void parse_menu(const char *arg GCC_UNUSED,
 	    } else if (port &&	/* Other types need port */
 		       (gtype != GOPHER_DUPLICATE ||
 			this_type != GOPHER_ERROR)) {
-		char *address = 0;
-		const char *format = *selector ? "%s//%s@%s/" : "%s//%s/";
+		char *address = NULL;
 
 		if (gtype == GOPHER_TELNET) {
 		    PUTS(" (TEL) ");
 		    if (*selector == '/')
 			++selector;
-		    HTSprintf0(&address, format, STR_TELNET_URL, selector, host);
+		    HTSprintf0(&address, "%s//%s%s%s/", STR_TELNET_URL,
+			       selector, (*selector ? "@" : ""), host);
 		} else if (gtype == GOPHER_TN3270) {
 		    PUTS("(3270) ");
 		    if (*selector == '/')
 			++selector;
-		    HTSprintf0(&address, format, STR_TN3270_URL, selector, host);
+		    HTSprintf0(&address, "%s//%s%s%s/", STR_TN3270_URL,
+			       selector, (*selector ? "@" : ""), host);
 		} else {	/* If parsed ok */
 		    char *r;
 
@@ -803,7 +804,7 @@ static void interpret_cso_key(const char *key,
 {
     CSOfield_info *fld;
 
-    if ((fld = ctx->fld) != 0) {
+    if ((fld = ctx->fld) != NULL) {
 	/*
 	 * Most substitutions only recognized inside of loops.
 	 */
@@ -1241,7 +1242,7 @@ static int generate_cso_form(char *host,
 			j = 0;
 		    }
 		    if (ctx.seek) {
-			char *temp = 0;
+			char *temp = NULL;
 
 			HTSprintf0(&temp, GOPHER_CSO_SEEK_FAILED, ctx.seek);
 			(*Target->isa->put_block) (Target, temp, (int) strlen(temp));
@@ -1276,7 +1277,7 @@ static int generate_cso_report(HTStream *Target)
 {
     int ich;
     char line[BIG];
-    char *buf = 0;
+    char *buf = NULL;
     char *p = line, *href = NULL;
     int i, prev_ndx, ndx;
     char *rcode, *ndx_str, *fname, *fvalue, *l;
@@ -1569,7 +1570,7 @@ static int HTLoadCSO(const char *arg,
 			   format_out,
 			   sink, anAnchor);
     if (Target == NULL) {
-	char *temp = 0;
+	char *temp = NULL;
 
 	HTSprintf0(&temp, CANNOT_CONVERT_I_TO_O,
 		   HTAtom_name(format_in), HTAtom_name(format_out));
@@ -1744,17 +1745,17 @@ static char *link_to_URL(const char *arg)
 {
     char *result;
     char *next;
-    char *temp = 0;
+    char *temp = NULL;
 
     StrAllocCopy(temp, arg);
     HTUnEscape(temp);
     result = temp;
 
     /* skip past method://host */
-    if ((next = strstr(result, "://")) != 0) {
+    if ((next = strstr(result, "://")) != NULL) {
 	result = next + 3;
     }
-    if ((next = strchr(result, '/')) != 0) {
+    if ((next = strchr(result, '/')) != NULL) {
 	result = next + 1;
     }
     /* check if the selector is the special html one */
@@ -1765,7 +1766,7 @@ static char *link_to_URL(const char *arg)
 	while ((*temp++ = *next++) != 0) ;
     } else {
 	FREE(temp);
-	result = 0;
+	result = NULL;
     }
     return result;
 }
@@ -1923,7 +1924,7 @@ static int HTLoadGopher(const char *arg,
     /*
      * Check for link to URL
      */
-    if ((hURL = link_to_URL(arg)) != 0) {
+    if ((hURL = link_to_URL(arg)) != NULL) {
 	CTRACE((tfp, "gopher found link to URL '%s'\n", hURL));
 	free(hURL);
     }
@@ -2024,8 +2025,8 @@ static int HTLoadGopher(const char *arg,
 
     default:
 	{
-	    HTAtom *encoding = 0;
-	    const char *desc = 0;
+	    HTAtom *encoding = NULL;
+	    const char *desc = NULL;
 	    HTFormat format = HTFileFormat(arg, &encoding, &desc);
 
 	    /*

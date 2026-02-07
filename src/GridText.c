@@ -1,5 +1,5 @@
 /*
- * $LynxId: GridText.c,v 1.349 2024/04/11 20:24:32 tom Exp $
+ * $LynxId: GridText.c,v 1.356 2025/08/08 00:11:44 tom Exp $
  *
  *		Character grid hypertext object
  *		===============================
@@ -56,7 +56,7 @@
 #include <LYStyle.h>
 #endif
 
-#ifdef EXP_WCWIDTH_SUPPORT
+#ifdef USE_WCWIDTH_SUPPORT
 #  if defined(PDCURSES) && defined(PDC_WIDE)
      /* PDCurses SDL2: always use mk_wcwidth for consistent CJK width handling */
 #    include <wcwidth.h>
@@ -197,7 +197,7 @@ typedef struct {
 } HTStyleChange;
 
 #if defined(USE_COLOR_STYLE)
-#define MAX_STYLES_ON_LINE   64
+#define MAX_STYLES_ON_LINE   MAX_LINE
   /* buffers used when current line is being aggregated, in split_line() */
 static HTStyleChange stylechanges_buffers[2][MAX_STYLES_ON_LINE];
 #endif
@@ -613,12 +613,12 @@ char star_string[MAX_LINE + 1];
 static int ctrl_chars_on_this_line = 0;		/* num of ctrl chars in current line */
 static int utfxtra_on_this_line = 0;	/* num of UTF-8 extra bytes in line,
 					   they *also* count as ctrl chars. */
-#ifdef EXP_WCWIDTH_SUPPORT
+#ifdef USE_WCWIDTH_SUPPORT
 static int utfxtracells_on_this_line = 0;	/* num of UTF-8 extra cells in line */
 #endif
 
 #if defined(WIDEC_CURSES) || (defined(PDCURSES) && defined(PDC_WIDE))
-# ifdef EXP_WCWIDTH_SUPPORT
+# ifdef USE_WCWIDTH_SUPPORT
 #define UTFXTRA_ON_THIS_LINE utfxtracells_on_this_line
 # else
 #define UTFXTRA_ON_THIS_LINE 0
@@ -628,9 +628,9 @@ static int utfxtracells_on_this_line = 0;	/* num of UTF-8 extra cells in line */
 #endif
 
 static HTStyle default_style =
-{0, NULL, "(Unstyled)", 0, NULL, "",
- (HTFont) 0, 1, HT_BLACK, 0, 0,
- 0, 0, 0, HT_LEFT, 1, 0, 0,
+{NULL, NULL, "(Unstyled)", 0, NULL, "",
+ (HTFont) 0, 1, HT_BLACK, 0, NULL,
+ 0, 0, 0, HT_LEFT, 1, 0, NULL,
  NO, NO, 0, 0, 0};
 
 static HTList *loaded_texts = NULL;	/* A list of all those in memory */
@@ -747,7 +747,7 @@ static void *LY_check_calloc(size_t nmemb, size_t size)
 
 #endif /* CHECK_FREE_MEM */
 
-#ifdef EXP_WCWIDTH_SUPPORT
+#ifdef USE_WCWIDTH_SUPPORT
 static int utfextracells(const char *s)
 {
     UCode_t ucs = UCGetUniFromUtf8String(&s);
@@ -769,9 +769,9 @@ static void permit_split_after_CJchar(HText *text, const char *s, unsigned short
     if (isUTF8CJChar(s))
 	text->permissible_split = pos;
 }
-#endif /* EXP_WCWIDTH_SUPPORT */
+#endif /* USE_WCWIDTH_SUPPORT */
 
-#if defined(EXP_WCWIDTH_SUPPORT) || defined(EXP_JAPANESE_SPACES)
+#if defined(USE_WCWIDTH_SUPPORT) || defined(EXP_JAPANESE_SPACES)
 BOOL isUTF8CJChar(const char *s)
 {
     UCode_t u = UCGetUniFromUtf8String(&s);
@@ -786,7 +786,7 @@ BOOL isUTF8CJChar(const char *s)
 	return YES;
     return NO;
 }
-#endif /* EXP_WCWIDTH_SUPPORT || EXP_JAPANESE_SPACES */
+#endif /* USE_WCWIDTH_SUPPORT || EXP_JAPANESE_SPACES */
 
 #ifdef USE_COLOR_STYLE
 /*
@@ -1049,7 +1049,7 @@ static void FormList_delete(HTList *forms)
 #ifdef DISP_PARTIAL
 static void ResetPartialLinenos(HText *text)
 {
-    if (text != 0) {
+    if (text != NULL) {
 	text->first_lineno_last_disp_partial = -1;
 	text->last_lineno_last_disp_partial = -1;
     }
@@ -1784,7 +1784,7 @@ static void display_title(HText *text)
 	percent[0] = '\0';
     } else if ((display_lines) <= 0 && LYlines > 0 &&
 	       text->top_of_screen <= 99999 && text->Lines <= 999999) {
-	sprintf(percent, gettext(" (l%d of %d)"),
+	sprintf(percent, LY_MSG(" (l%d of %d)"),
 		text->top_of_screen, text->Lines);
     } else if ((text->Lines >= display_lines) && (display_lines > 0)) {
 	int total_pages = ((text->Lines + display_lines)
@@ -1793,7 +1793,7 @@ static void display_title(HText *text)
 				  ? 0
 				  : (text->Lines - display_lines));
 
-	sprintf(percent, gettext(" (p%d of %d)"),
+	sprintf(percent, LY_MSG(" (p%d of %d)"),
 		((text->top_of_screen > start_of_last_page)
 		 ? total_pages
 		 : ((text->top_of_screen + display_lines) / (display_lines))),
@@ -2593,7 +2593,7 @@ void HText_beginAppend(HText *text)
 }
 
 /*
- * LYcols_cu is the notion that the display library has of the screen width. 
+ * LYcols_cu is the notion that the display library has of the screen width.
  * Checks of the line length (as the non-UTF-8-aware display library would see
  * it) against LYcols_cu are used to try to prevent lines with UTF-8 chars from
  * being wrapped by the library when they shouldn't.  If there is no display
@@ -2788,7 +2788,7 @@ static HTLine *insert_blanks_in_line(HTLine *line, int line_number,
 		    break;
 		ioldc++;
 		pre = s + 1;
-#ifdef EXP_WCWIDTH_SUPPORT
+#ifdef USE_WCWIDTH_SUPPORT
 		if (text && text->T.output_utf8 && IS_UTF_FIRST(*s))
 		    ioldc += utfextracells(s);
 #endif
@@ -2859,7 +2859,7 @@ static HTStyleChange *skip_matched_and_correct_offsets(HTStyleChange *end,
 						       HTStyleChange *start,
 						       unsigned split_pos)
 {
-    HTStyleChange *result = 0;
+    HTStyleChange *result = NULL;
     int level = 0;
     HTStyleChange *tmp = end;
 
@@ -2934,7 +2934,7 @@ static void split_line(HText *text, unsigned split)
 
     ctrl_chars_on_this_line = 0;	/*reset since we are going to a new line */
     utfxtra_on_this_line = 0;	/*reset too, we'll count them */
-#ifdef EXP_WCWIDTH_SUPPORT
+#ifdef USE_WCWIDTH_SUPPORT
     utfxtracells_on_this_line = 0;
 #endif
     HText_setLastChar(text, ' ');
@@ -3064,7 +3064,7 @@ static void split_line(HText *text, unsigned split)
 		    ctrl_chars_on_this_line++;
 		} else if (IS_UTF_EXTRA(p[i])) {
 		    utfxtra_on_this_line++;
-#ifdef EXP_WCWIDTH_SUPPORT
+#ifdef USE_WCWIDTH_SUPPORT
 		} else if (IS_UTF_FIRST(p[i])) {
 		    utfxtracells_on_this_line += utfextracells(&p[i]);
 #endif
@@ -3412,7 +3412,7 @@ static void split_line(HText *text, unsigned split)
 	 */
 	/* Our operations can make a non-empty all-whitespace link
 	   empty.  So what? */
-	if ((a = text->last_anchor_before_split) == 0)
+	if ((a = text->last_anchor_before_split) == NULL)
 	    a = text->first_anchor;
 
 	for (; a; a = a->next) {
@@ -4251,7 +4251,7 @@ void HText_appendCharacter(HText *text, int ch)
 		utfxtra_on_this_line++;
 		ctrl_chars_on_this_line++;
 	    }
-#ifdef EXP_WCWIDTH_SUPPORT
+#ifdef USE_WCWIDTH_SUPPORT
 	    /* permit_split_after_CJchar on last byte of UTF-8 sequence */
 	    {
 		int utff = line->size - 2;
@@ -4487,7 +4487,7 @@ void HText_appendCharacter(HText *text, int ch)
 	    (actual
 	     + (int) style->rightIndent
 	     + ((IS_CJK_TTY && text->kanji_buf) ? 1 : 0)
-#ifdef EXP_WCWIDTH_SUPPORT
+#ifdef USE_WCWIDTH_SUPPORT
 	     + utfxtracells_on_this_line
 #endif
 	    ) >= WRAP_COLS(text))
@@ -4698,7 +4698,7 @@ void _internal_HTC(HText *text, int style, int dir)
     HTLine *line;
 
     /* can't change style if we have no text to change style with */
-    if (text != 0) {
+    if (text != NULL) {
 
 	line = text->last_line;
 
@@ -5195,9 +5195,9 @@ BOOLEAN HText_endStblTABLE(HText *me)
 #endif
 
     CTRACE((tfp, "endStblTABLE: have%s enclosing table (%p)\n",
-	    enclosing == 0 ? " NO" : "", (void *) enclosing));
+	    enclosing == NULL ? " NO" : "", (void *) enclosing));
 
-    return (BOOLEAN) (enclosing != 0);
+    return (BOOLEAN) (enclosing != NULL);
 }
 
 /*	Start simple table row
@@ -5310,19 +5310,19 @@ static void compute_show_number(TextAnchor *a)
 
     a->show_number = a->number;
     if (unique_urls
-	&& HTMainText != 0
-	&& HTMainText->first_anchor != 0
-	&& a->anchor != 0
-	&& (cur = a->anchor->dest) != 0
-	&& cur->parent != 0
-	&& cur->parent->address != 0) {
+	&& HTMainText != NULL
+	&& HTMainText->first_anchor != NULL
+	&& a->anchor != NULL
+	&& (cur = a->anchor->dest) != NULL
+	&& cur->parent != NULL
+	&& cur->parent->address != NULL) {
 
 	match = 0;
 	for (b = HTMainText->first_anchor; b != a; b = b->next) {
-	    if (b->anchor != 0
-		&& (tst = b->anchor->dest) != 0
-		&& tst->parent != 0
-		&& tst->parent->address != 0
+	    if (b->anchor != NULL
+		&& (tst = b->anchor->dest) != NULL
+		&& tst->parent != NULL
+		&& tst->parent->address != NULL
 		&& !strcmp(cur->parent->address,
 			   tst->parent->address)
 		&& !strcmp(NonNull(a->anchor->tag), NonNull(b->anchor->tag))) {
@@ -5360,8 +5360,8 @@ static void add_link_number(HText *text, TextAnchor *a, int save_position)
 	compute_show_number(a);
 
 	if (dump_links_inline
-	    && (link_dest = HTAnchor_followLink(a->anchor)) != 0
-	    && (link_text = HTAnchor_address(link_dest)) != 0) {
+	    && (link_dest = HTAnchor_followLink(a->anchor)) != NULL
+	    && (link_text = HTAnchor_address(link_dest)) != NULL) {
 	    HText_appendText(text, "[");
 	    HText_appendText(text, link_text);
 	    HText_appendText(text, "]");
@@ -5400,7 +5400,7 @@ int HText_beginAnchor(HText *text, int underline,
     } else {
 	text->first_anchor = a;
     }
-    a->next = 0;
+    a->next = NULL;
     a->anchor = anc;
     a->extent = 0;
     a->link_type = HYPERTEXT_ANCHOR;
@@ -5992,7 +5992,7 @@ void HText_endAppend(HText *text)
     /*
      * Get the first line.
      */
-    if (LYtrimBlankLines && (line_ptr = FirstHTLine(text)) != 0) {
+    if (LYtrimBlankLines && (line_ptr = FirstHTLine(text)) != NULL) {
 	/*
 	 * Remove blank lines at the end of the document.
 	 */
@@ -6213,7 +6213,7 @@ static void HText_trimHightext(HText *text,
 	actual_len = anchor_ptr->extent;
 
 	line_ptr2 = line_ptr;
-	assert(line_ptr2 != 0);
+	assert(line_ptr2 != NULL);
 
 	count_line = cur_line;
 	while (actual_len > hilite_len) {
@@ -6433,7 +6433,7 @@ int HText_findAnchorNumber(void *avoid)
 
 static const char *inputFieldDesc(FormInfo * input)
 {
-    const char *result = 0;
+    const char *result = NULL;
 
     switch (input->type) {
     case F_TEXT_TYPE:
@@ -6530,7 +6530,7 @@ int HTGetRelLinkNum(int num,
 		    int rel,
 		    int cur)
 {
-    TextAnchor *a, *l = 0;
+    TextAnchor *a, *l = NULL;
     int scrtop = HText_getTopOfScreen();	/*XXX +1? */
     int curline = links[cur].anchor_line_num;
     int curpos = links[cur].lx;
@@ -7160,7 +7160,7 @@ int HText_getNumOfBytes(void)
     int result = -1;
     HTLine *line = NULL;
 
-    if (HTMainText != 0) {
+    if (HTMainText != NULL) {
 	for (line = FirstHTLine(HTMainText);
 	     line != HTMainText->last_line;
 	     line = line->next) {
@@ -7177,14 +7177,14 @@ int HText_getNumOfBytes(void)
 const char *HText_getTitle(void)
 {
     return (HTMainText ?
-	    HTAnchor_title(HTMainText->node_anchor) : 0);
+	    HTAnchor_title(HTMainText->node_anchor) : NULL);
 }
 
 #ifdef USE_COLOR_STYLE
 const char *HText_getStyle(void)
 {
     return (HTMainText ?
-	    HTAnchor_style(HTMainText->node_anchor) : 0);
+	    HTAnchor_style(HTMainText->node_anchor) : NULL);
 }
 #endif
 
@@ -7196,7 +7196,7 @@ const char *HText_getStyle(void)
 const char *HText_getSugFname(void)
 {
     return (HTMainText ?
-	    HTAnchor_SugFname(HTMainText->node_anchor) : 0);
+	    HTAnchor_SugFname(HTMainText->node_anchor) : NULL);
 }
 
 /*
@@ -7330,7 +7330,7 @@ void HTCheckFnameForCompression(char **fname,
 const char *HText_getLastModified(void)
 {
     return (HTMainText ?
-	    HTAnchor_last_modified(HTMainText->node_anchor) : 0);
+	    HTAnchor_last_modified(HTMainText->node_anchor) : NULL);
 }
 
 /*
@@ -7340,7 +7340,7 @@ const char *HText_getLastModified(void)
 const char *HText_getDate(void)
 {
     return (HTMainText ?
-	    HTAnchor_date(HTMainText->node_anchor) : 0);
+	    HTAnchor_date(HTMainText->node_anchor) : NULL);
 }
 
 /*
@@ -7350,7 +7350,7 @@ const char *HText_getDate(void)
 const char *HText_getServer(void)
 {
     return (HTMainText ?
-	    HTAnchor_server(HTMainText->node_anchor) : 0);
+	    HTAnchor_server(HTMainText->node_anchor) : NULL);
 }
 
 /*
@@ -7360,7 +7360,7 @@ const char *HText_getServer(void)
 const char *HText_getHttpHeaders(void)
 {
     return (HTMainText ?
-	    HTAnchor_http_headers(HTMainText->node_anchor) : 0);
+	    HTAnchor_http_headers(HTMainText->node_anchor) : NULL);
 }
 
 /*
@@ -7449,7 +7449,7 @@ int HText_closestAnchor(HText *text, int offset)
 	    }
 	}
     }
-    if (result < 0 && closest != 0) {
+    if (result < 0 && closest != NULL) {
 	result = closest->number;
     }
 
@@ -7509,7 +7509,7 @@ int HText_getAbsLineNumber(HText *text,
 {
     int result = -1;
 
-    if (anchor_number >= 0 && text != 0) {
+    if (anchor_number >= 0 && text != NULL) {
 	TextAnchor *Anchor_ptr = NULL;
 
 	for (Anchor_ptr = text->first_anchor;
@@ -7609,7 +7609,7 @@ BOOL HText_canScrollDown(void)
 {
     HText *text = HTMainText;
 
-    return (BOOL) ((text != 0)
+    return (BOOL) ((text != NULL)
 		   && ((text->top_of_screen + display_lines) <= text->Lines));
 }
 
@@ -7738,7 +7738,7 @@ BOOL HTFindPoundSelector(const char *selector)
     TextAnchor *a;
 
     CTRACE((tfp, "FindPound: searching for \"%s\"\n", selector));
-    for (a = HTMainText->first_anchor; a != 0; a = a->next) {
+    for (a = HTMainText->first_anchor; a != NULL; a = a->next) {
 
 	if (a->anchor && a->anchor->tag) {
 	    if (!strcmp(a->anchor->tag, selector)) {
@@ -7817,7 +7817,7 @@ void HText_updateStyle(HText *me GCC_UNUSED, HTStyle *style GCC_UNUSED)
 */
 HTStyle *HText_selectionStyle(HText *me GCC_UNUSED, HTStyleSheet *sheet GCC_UNUSED)
 {
-    return 0;
+    return NULL;
 }
 
 /*	Paste in styled text
@@ -7852,14 +7852,14 @@ void HText_unlinkSelection(HText *me GCC_UNUSED)
 
 HTAnchor *HText_referenceSelected(HText *me GCC_UNUSED)
 {
-    return 0;
+    return NULL;
 }
 
 int HText_getTopOfScreen(void)
 {
     HText *text = HTMainText;
 
-    return text != 0 ? text->top_of_screen : 0;
+    return text != NULL ? text->top_of_screen : 0;
 }
 
 int HText_getLines(HText *text)
@@ -7888,7 +7888,7 @@ int HText_getPreferredTopLine(HText *text, int line_number)
 HTAnchor *HText_linkSelTo(HText *me GCC_UNUSED,
 			  HTAnchor * anchor GCC_UNUSED)
 {
-    return 0;
+    return NULL;
 }
 
 /*
@@ -8221,7 +8221,7 @@ static unsigned countHTLines(void)
     unsigned result = 0;
     HTLine *line = FirstHTLine(HTMainText);
 
-    while (line != 0) {
+    while (line != NULL) {
 	++result;
 	if (line == HTMainText->last_line)
 	    break;
@@ -8346,7 +8346,7 @@ static void freeAnchorIndex(AnchorIndex ** inx, unsigned inx_size)
     AnchorIndex *cur;
     unsigned num;
 
-    if (inx != 0) {
+    if (inx != NULL) {
 	if (inx_size != 0) {
 	    for (num = 0; num < inx_size; ++num) {
 		while ((cur = inx[num]) != NULL) {
@@ -8391,7 +8391,7 @@ void print_wwwfile_to_fd(FILE *fp,
     int first = TRUE;
     HTLine *line;
     AnchorIndex **inx;		/* sorted index of input-fields */
-    AnchorIndex *cur = 0;	/* current input-field */
+    AnchorIndex *cur = NULL;	/* current input-field */
     unsigned inx_size;		/* number of entries in inx[] */
     int in_field = -1;		/* if positive, is index in cur->value[] */
     int this_wrap = 0;		/* current wrapping point of cur->value[] */
@@ -8402,7 +8402,7 @@ void print_wwwfile_to_fd(FILE *fp,
     BOOL in_b = FALSE;
     BOOL in_u = FALSE;
     BOOL bs = (BOOL) (!is_email && !is_reply
-		      && text != 0
+		      && text != NULL
 		      && with_backspaces
 		      && !IS_CJK_TTY
 		      && !text->T.output_utf8);
@@ -8466,21 +8466,21 @@ void print_wwwfile_to_fd(FILE *fp,
 	    cell_len = 1;
 	    cell_chr = UCH(*cell_ptr);
 
-	    while (cur != 0 && FieldLast(cur, this_wrap) < byte_offset) {
+	    while (cur != NULL && FieldLast(cur, this_wrap) < byte_offset) {
 		CTRACE2(TRACE_GRIDTEXT,
 			(tfp, "skip field since last %d < %d\n",
 			 FieldLast(cur, this_wrap), byte_offset));
 		cur = cur->next;
 		in_field = -1;
 	    }
-	    if (cur != 0 && in_field >= 0) {
+	    if (cur != NULL && in_field >= 0) {
 		CTRACE2(TRACE_GRIDTEXT,
 			(tfp, "compare %d to [%d..%d]\n",
 			 byte_offset,
 			 FieldFirst(cur, this_wrap),
 			 FieldLast(cur, this_wrap) - 1));
 	    }
-	    if (cur != 0
+	    if (cur != NULL
 		&& FieldFirst(cur, this_wrap) <= byte_offset
 		&& FieldLast(cur, this_wrap) > byte_offset) {
 		int off2 = ((in_field > 0)
@@ -8788,13 +8788,13 @@ static TextAnchor *line_num_to_anchor(int line_num)
 {
     TextAnchor *a;
 
-    if (HTMainText != 0) {
+    if (HTMainText != NULL) {
 	a = HTMainText->first_anchor;
-	while (a != 0 && a->line_num < line_num) {
+	while (a != NULL && a->line_num < line_num) {
 	    a = a->next;
 	}
     } else {
-	a = 0;
+	a = NULL;
     }
     return a;
 }
@@ -8818,9 +8818,9 @@ static TextAnchor *get_prev_anchor(TextAnchor *a)
 {
     TextAnchor *p, *q;
 
-    if (a->prev == 0) {
-	if ((p = HTMainText->first_anchor) != 0) {
-	    while ((q = p->next) != 0) {
+    if (a->prev == NULL) {
+	if ((p = HTMainText->first_anchor) != NULL) {
+	    while ((q = p->next) != NULL) {
 		q->prev = p;
 		p = q;
 	    }
@@ -8960,7 +8960,7 @@ void user_message(const char *message,
     } else {
 	char *temp = NULL;
 
-	HTSprintf0(&temp, message, NonNull(argument));
+	HTSprintf0(&temp, HT_FMT("%s", message), NonNull(argument));
 	statusline(temp);
 	FREE(temp);
     }
@@ -8973,7 +8973,7 @@ void user_message(const char *message,
 const char *HText_getOwner(void)
 {
     return (HTMainText ?
-	    HTAnchor_owner(HTMainText->node_anchor) : 0);
+	    HTAnchor_owner(HTMainText->node_anchor) : NULL);
 }
 
 /*
@@ -8996,7 +8996,7 @@ void HText_setMainTextOwner(const char *owner)
 const char *HText_getRevTitle(void)
 {
     return (HTMainText ?
-	    HTAnchor_RevTitle(HTMainText->node_anchor) : 0);
+	    HTAnchor_RevTitle(HTMainText->node_anchor) : NULL);
 }
 
 /*
@@ -9006,7 +9006,7 @@ const char *HText_getRevTitle(void)
 const char *HText_getContentBase(void)
 {
     return (HTMainText ?
-	    HTAnchor_content_base(HTMainText->node_anchor) : 0);
+	    HTAnchor_content_base(HTMainText->node_anchor) : NULL);
 }
 
 /*
@@ -9016,7 +9016,7 @@ const char *HText_getContentBase(void)
 const char *HText_getContentLocation(void)
 {
     return (HTMainText ?
-	    HTAnchor_content_location(HTMainText->node_anchor) : 0);
+	    HTAnchor_content_location(HTMainText->node_anchor) : NULL);
 }
 
 /*
@@ -9077,7 +9077,7 @@ static void magicUncache(void)
 /* dummy - kw */
 static HTProtocol scm =
 {
-    "source-cache-mem", 0, 0
+    "source-cache-mem", NULL, NULL
 };
 
 static BOOLEAN useSourceCache(void)
@@ -9085,7 +9085,7 @@ static BOOLEAN useSourceCache(void)
     BOOLEAN result = FALSE;
 
     if (LYCacheSource == SOURCE_CACHE_FILE) {
-	result = (BOOLEAN) (HTMainAnchor->source_cache_file != 0);
+	result = (BOOLEAN) (HTMainAnchor->source_cache_file != NULL);
 	CTRACE((tfp, "SourceCache: file-cache%s found\n",
 		result ? "" : " not"));
     }
@@ -9097,7 +9097,7 @@ static BOOLEAN useMemoryCache(void)
     BOOLEAN result = FALSE;
 
     if (LYCacheSource == SOURCE_CACHE_MEMORY) {
-	result = (BOOLEAN) (HTMainAnchor->source_cache_chunk != 0);
+	result = (BOOLEAN) (HTMainAnchor->source_cache_chunk != NULL);
 	CTRACE((tfp, "SourceCache: memory-cache%s found\n",
 		result ? "" : " not"));
     }
@@ -9250,7 +9250,7 @@ BOOLEAN HTdocument_settings_changed(void)
 
     if (TRACE) {
 	/*
-	 * If we're tracing, note everying that has changed.
+	 * If we're tracing, note everything that has changed.
 	 */
 	trace_setting_change("CLICKABLE_IMAGES",
 			     HTMainText->clickable_images, clickable_images);
@@ -9298,7 +9298,7 @@ BOOLEAN HTdocument_settings_changed(void)
 
 int HTisDocumentSource(void)
 {
-    return (HTMainText != 0) ? HTMainText->source : FALSE;
+    return (HTMainText != NULL) ? HTMainText->source : FALSE;
 }
 
 const char *HTLoadedDocumentURL(void)
@@ -9319,7 +9319,7 @@ bstring *HTLoadedDocumentPost_data(void)
 	&& HTMainText->node_anchor->post_data)
 	return (HTMainText->node_anchor->post_data);
     else
-	return (0);
+	return (NULL);
 }
 
 const char *HTLoadedDocumentTitle(void)
@@ -9457,7 +9457,7 @@ static int HText_TrueLineSize(HTLine *line, HText *text, int IgnoreSpaces)
 		UCH(line->data[i]) != HT_NON_BREAK_SPACE &&
 		UCH(line->data[i]) != HT_EN_SPACE) {
 		true_size++;
-#ifdef EXP_WCWIDTH_SUPPORT
+#ifdef USE_WCWIDTH_SUPPORT
 		if (text && text->T.output_utf8 &&
 		    IS_UTF_FIRST(line->data[i])) {
 		    true_size += utfextracells(&(line->data[i]));
@@ -9470,7 +9470,7 @@ static int HText_TrueLineSize(HTLine *line, HText *text, int IgnoreSpaces)
 	    if (!IsSpecialAttrChar(line->data[i]) &&
 		IS_UTF8_EXTRA(line->data[i])) {
 		true_size++;
-#ifdef EXP_WCWIDTH_SUPPORT
+#ifdef USE_WCWIDTH_SUPPORT
 		if (text && text->T.output_utf8 &&
 		    IS_UTF_FIRST(line->data[i])) {
 		    true_size += utfextracells(&(line->data[i]));
@@ -9688,7 +9688,7 @@ static void HText_AddHiddenLink(HText *text, TextAnchor *textanchor)
 	    for (cnt = 0;; ++cnt) {
 
 		check = (char *) HTList_objectAt(text->hidden_links, cnt);
-		if (check == 0)
+		if (check == NULL)
 		    break;
 		if (!strcmp(check, value)) {
 		    ignore = TRUE;
@@ -9827,7 +9827,7 @@ void HText_beginForm(char *action,
     }
 
     /*
-     * Create a new "PerFormInfo" structure to hold info on the current form. 
+     * Create a new "PerFormInfo" structure to hold info on the current form.
      * This will be appended to the forms list kept by the HText object if and
      * when we reach a HText_endForm.
      */
@@ -9887,7 +9887,7 @@ void HText_endForm(HText *text)
 	}
 
 	/*
-	 * Append info on the current form to the HText object's list of forms. 
+	 * Append info on the current form to the HText object's list of forms.
 	 * HText_beginInput call will have set some of the data in the
 	 * PerFormInfo structure (if there were any form fields at all).
 	 */
@@ -10180,7 +10180,7 @@ char *HText_setLastOptionValue(HText *text, char *value,
 	}
 	cp[j] = '\0';
 	if (IS_CJK_TTY) {
-	    if ((tmp = typecallocn(unsigned char, strlen(cp) * 2 + 1)) != 0) {
+	    if ((tmp = typecallocn(unsigned char, strlen(cp) * 2 + 1)) != NULL) {
 		if (kanji_code == EUC) {
 		    TO_EUC((unsigned char *) cp, tmp);
 		    val_cs = current_char_set;
@@ -10270,7 +10270,7 @@ char *HText_setLastOptionValue(HText *text, char *value,
 	    /*
 	     * Change the value.
 	     */
-	    if (HTCurSelectedOptionValue == 0)
+	    if (HTCurSelectedOptionValue == NULL)
 		StrAllocCopy(HTCurSelectedOptionValue, "");
 	    text->last_anchor->input_field->size =
 		(int) strlen(HTCurSelectedOptionValue);
@@ -10372,7 +10372,7 @@ int HText_beginInput(HText *text,
 	}
     }
 
-    a->next = 0;
+    a->next = NULL;
     a->anchor = NULL;
     a->link_type = INPUT_ANCHOR;
     a->show_anchor = YES;
@@ -10382,7 +10382,7 @@ int HText_beginInput(HText *text,
 
     a->input_field = f;
 
-    f->select_list = 0;
+    f->select_list = NULL;
     f->number = HTFormNumber;
     f->disabled = HTFormDisabled || I->disabled;
     f->readonly = I->readonly;
@@ -10399,7 +10399,7 @@ int HText_beginInput(HText *text,
     if (IValue &&
 	IS_CJK_TTY &&
 	((I->type == NULL) || strcasecomp(I->type, "hidden"))) {
-	if ((tmp = typecallocn(unsigned char, strlen(IValue) * 2 + 1)) != 0) {
+	if ((tmp = typecallocn(unsigned char, strlen(IValue) * 2 + 1)) != NULL) {
 	    if (kanji_code == EUC) {
 		TO_EUC((unsigned char *) IValue, tmp);
 		I->value_cs = current_char_set;
@@ -10671,7 +10671,7 @@ int HText_beginInput(HText *text,
 	break;
     }
     if (fields_are_numbered() && (a->number > 0)) {
-	if (HTMainText != 0) {
+	if (HTMainText != NULL) {
 	    HText_findAnchorNumber(a);
 	} else {
 	    a->show_number = a->number;
@@ -10940,7 +10940,7 @@ static void load_a_file(const char *val_used,
     CTRACE((tfp, "Ok, about to convert \"%s\" to mime/thingy\n", val_used));
 
     if (*val_used) {		/* ignore empty form field */
-	if ((fd = fopen(val_used, BIN_R)) == 0) {
+	if ((fd = fopen(val_used, BIN_R)) == NULL) {
 	    HTAlert(gettext("Can't open file for uploading"));
 	} else {
 	    while ((bytes = fread(bfr, sizeof(char), sizeof(bfr) - 1, fd)) != 0) {
@@ -10957,7 +10957,7 @@ static const char *guess_content_type(const char *filename)
     const char *desc;
     HTFormat format = HTFileFormat(filename, &encoding, &desc);
 
-    return (format != 0 && non_empty(format->name))
+    return (format != NULL && non_empty(format->name))
 	? format->name
 	: STR_PLAINTEXT;
 }
@@ -11130,7 +11130,7 @@ static char *escape_or_quote_name(const char *name,
 	StrAllocCopy(escaped1, "Content-Disposition: form-data");
 	HTSprintf(&escaped1, "; name=\"%s\"", name);
 	if (MultipartContentType)
-	    HTSprintf(&escaped1, MultipartContentType, STR_PLAINTEXT);
+	    HTSprintf(&escaped1, HT_FMT("%s", MultipartContentType), STR_PLAINTEXT);
 	if (quoting == QUOTE_BASE64)
 	    StrAllocCat(escaped1, "\r\nContent-Transfer-Encoding: base64");
 	StrAllocCat(escaped1, "\r\n\r\n");
@@ -11175,7 +11175,7 @@ static int check_if_base64_needed(int submit_method,
     BOOL printable = TRUE;
     char *text = BStrData(data);
 
-    if (text != 0) {
+    if (text != NULL) {
 	int col = 0;
 	int n;
 	int length = BStrLen(data);
@@ -11424,7 +11424,7 @@ int HText_SubmitForm(FormInfo * submit_item, DocInfo *doc,
      */
     if (anchor_limit != 0) {
 	my_data = typecallocn(PostData, (size_t) anchor_limit);
-	if (my_data == 0)
+	if (my_data == NULL)
 	    outofmem(__FILE__, "HText_SubmitForm");
     }
 
@@ -11822,7 +11822,7 @@ int HText_SubmitForm(FormInfo * submit_item, DocInfo *doc,
 	    if (!skip_field) {
 		StrAllocCopy(my_data[anchor_count].name, name_used);
 		StrAllocCopy(my_data[anchor_count].value, val_used);
-		if (my_data[anchor_count].data == 0)
+		if (my_data[anchor_count].data == NULL)
 		    BStrCat0(my_data[anchor_count].data, val_used);
 		my_data[anchor_count].quote = quoting;
 		if (quoting == QUOTE_MULTI
@@ -11850,17 +11850,17 @@ int HText_SubmitForm(FormInfo * submit_item, DocInfo *doc,
 
     FREE(copied_name_used);
 
-    if (my_data != 0) {
+    if (my_data != NULL) {
 	BOOL first_one = TRUE;
 
 	/*
 	 * If we're using a MIME-boundary, make it unique.
 	 */
-	if (content_type_out != 0 && Boundary != 0) {
-	    Boundary = 0;
+	if (content_type_out != NULL && Boundary != NULL) {
+	    Boundary = NULL;
 	    StrAllocCopy(Boundary, "LYNX");
 	    for (anchor_count = 0; anchor_count < anchor_limit; ++anchor_count) {
-		if (my_data[anchor_count].data != 0) {
+		if (my_data[anchor_count].data != NULL) {
 		    UpdateBoundary(&Boundary, my_data[anchor_count].data);
 		}
 	    }
@@ -11869,8 +11869,8 @@ int HText_SubmitForm(FormInfo * submit_item, DocInfo *doc,
 
 	for (anchor_count = 0; anchor_count < anchor_limit; ++anchor_count) {
 
-	    if (my_data[anchor_count].name != 0
-		&& my_data[anchor_count].value != 0) {
+	    if (my_data[anchor_count].name != NULL
+		&& my_data[anchor_count].value != NULL) {
 
 		CTRACE((tfp,
 			"processing [%d:%d] name=%s(first:%d, value=%s, data=%p)\n",
@@ -12129,7 +12129,7 @@ int HText_SubmitForm(FormInfo * submit_item, DocInfo *doc,
     }
 
     if (submit_item->submit_method == URL_MAIL_METHOD) {
-	HTUserMsg2(gettext("Submitting %s"), submit_item->submit_action);
+	HTUserMsg2(LY_MSG("Submitting %s"), submit_item->submit_action);
 	HTSABCat(&my_query, "", 1);	/* append null */
 	mailform((submit_item->submit_action + 7),
 		 (isEmpty(submit_item->submit_title)
@@ -12144,7 +12144,7 @@ int HText_SubmitForm(FormInfo * submit_item, DocInfo *doc,
 	_statusline(SUBMITTING_FORM);
 
 	/*
-	 * File-URLs (whether via GET or POST) cannot provide search queries. 
+	 * File-URLs (whether via GET or POST) cannot provide search queries.
 	 * The relevant RFCs 1630, 1738 are silent on what to do with
 	 * unexpected query parameters in a file-URL.
 	 *
@@ -12152,7 +12152,7 @@ int HText_SubmitForm(FormInfo * submit_item, DocInfo *doc,
 	 * not a legal part of a Windows filename), and other browsers copy the
 	 * behavior.  We do this for compatibility, in case someone cares.
 	 */
-	if (my_query != 0 &&
+	if (my_query != NULL &&
 	    my_query->len > 5 &&
 	    !strncmp(my_query->str, "file:", (size_t) 5)) {
 	    strtok(my_query->str, "?");
@@ -12176,7 +12176,7 @@ int HText_SubmitForm(FormInfo * submit_item, DocInfo *doc,
     FREE(MultipartContentType);
     FREE(previous_blanks);
     FREE(Boundary);
-    if (my_data != 0) {
+    if (my_data != NULL) {
 	for (anchor_count = 0; anchor_count < anchor_limit; ++anchor_count) {
 	    FREE(my_data[anchor_count].name);
 	    FREE(my_data[anchor_count].value);
@@ -12216,7 +12216,7 @@ void HText_ResetForm(FormInfo * form)
     TextAnchor *anchor_ptr;
 
     _statusline(RESETTING_FORM);
-    if (HTMainText == 0)
+    if (HTMainText == NULL)
 	return;
 
     /*
@@ -12264,7 +12264,7 @@ BOOLEAN HText_HaveUserChangedForms(HText *text)
 {
     TextAnchor *anchor_ptr;
 
-    if (text == 0)
+    if (text == NULL)
 	return FALSE;
 
     /*
@@ -12878,7 +12878,7 @@ static int increment_tagged_htline(HTLine *ht, TextAnchor *a, int *lx_val,
 			val += incr;
 			sprintf(lx, "%d", val);
 			new_n = (int) strlen(lx);
-			if ((r = StrChr(ht->next->data, ']')) == 0) {
+			if ((r = StrChr(ht->next->data, ']')) == NULL) {
 			    r = "";
 			}
 			strcat(lx, r);
@@ -12948,9 +12948,9 @@ static void insert_new_textarea_anchor(TextAnchor **curr_anchor, HTLine **exit_h
     TextAnchor *anchor = *curr_anchor;
     HTLine *htline;
 
-    TextAnchor *a = 0;
-    FormInfo *f = 0;
-    HTLine *l = 0;
+    TextAnchor *a = NULL;
+    FormInfo *f = NULL;
+    HTLine *l = NULL;
 
     int curr_tag = 0;		/* 0 ==> match any [tag] number */
     int lx = 0;			/* 0 ==> no line crossing [tag]; it's a new line */
@@ -13256,10 +13256,10 @@ static char *readEditedFile(char *ed_temp)
 	     * the lynx session is not over.  - kw
 	     */
 	    HTAlwaysAlert(NULL, MEMORY_EXHAUSTED_FILE);
-	    return 0;
+	    return NULL;
 	}
 
-	if ((fp = fopen(ed_temp, "r")) != 0) {
+	if ((fp = fopen(ed_temp, "r")) != NULL) {
 	    size = fread(ebuf, (size_t) 1, size, fp);
 	    LYCloseInput(fp);
 	    ebuf[size] = '\0';	/* Terminate! - kw */
@@ -13307,7 +13307,7 @@ static int finish_ExtEditForm(LinkInfo *form_link, TextAnchor *start_anchor,
 
     CTRACE((tfp, "GridText: entered HText_EditTextArea()\n"));
 
-    if ((ebuf = readEditedFile(ed_temp)) == 0) {
+    if ((ebuf = readEditedFile(ed_temp)) == NULL) {
 	return 0;
     }
 
@@ -13316,7 +13316,7 @@ static int finish_ExtEditForm(LinkInfo *form_link, TextAnchor *start_anchor,
      * struct.  Add new lines to the TEXTAREA if needed.  (Always leave
      * the user with a blank line at the end of the TEXTAREA.)
      */
-    if ((line = typeMallocn(char, line_used)) == 0)
+    if ((line = typeMallocn(char, line_used)) == NULL)
 	  outofmem(__FILE__, "HText_EditTextArea");
 
     anchor_ptr = start_anchor;
@@ -13343,7 +13343,7 @@ static int finish_ExtEditForm(LinkInfo *form_link, TextAnchor *start_anchor,
 	}
 	line[len0] = '\0';
 
-	if ((cp = StrChr(lp, '\n')) != 0)
+	if ((cp = StrChr(lp, '\n')) != NULL)
 	    len = (int) (cp - lp);
 	else
 	    len = (int) strlen(lp);
@@ -13421,7 +13421,7 @@ static int finish_ExtEditForm(LinkInfo *form_link, TextAnchor *start_anchor,
 	 */
 	if ((size_t) (len0 + len) >= line_used) {
 	    line_used = (size_t) (3 * (len0 + len)) / 2;
-	    if ((line = typeRealloc(char, line, line_used)) == 0)
+	    if ((line = typeRealloc(char, line, line_used)) == NULL)
 		  outofmem(__FILE__, "HText_EditTextArea");
 	}
 
@@ -13531,9 +13531,9 @@ int HText_EditTextArea(LinkInfo *form_link)
 
     CTRACE((tfp, "GridText: entered HText_EditTextArea()\n"));
 
-    if ((ed_temp = typeMallocn(char, LY_MAXPATH)) == 0) {
+    if ((ed_temp = typeMallocn(char, LY_MAXPATH)) == NULL) {
 	outofmem(__FILE__, "HText_EditTextArea");
-    } else if ((fp = LYOpenTemp(ed_temp, "", "w")) != 0) {
+    } else if ((fp = LYOpenTemp(ed_temp, "", "w")) != NULL) {
 
 	/*
 	 * Begin at the beginning, to find 1st anchor in the TEXTAREA, then
@@ -13567,7 +13567,7 @@ int HText_EditTextArea(LinkInfo *form_link)
 	}
 	LYCloseTempFP(fp);
 
-	if (start_anchor != 0) {
+	if (start_anchor != NULL) {
 	    CTRACE((tfp, "GridText: TEXTAREA name=|%s| dumped to tempfile\n", form->name));
 	    CTRACE((tfp, "GridText: invoking editor (%s) on tempfile\n", editor));
 
@@ -13616,7 +13616,7 @@ void HText_EditTextField(LinkInfo *form_link)
 
     ed_temp = typeMallocn(char, LY_MAXPATH);
 
-    if ((fp = LYOpenTemp(ed_temp, "", "w")) == 0) {
+    if ((fp = LYOpenTemp(ed_temp, "", "w")) == NULL) {
 	FREE(ed_temp);
 	return;
     }
@@ -13640,7 +13640,7 @@ void HText_EditTextField(LinkInfo *form_link)
 	char *ebuf;
 	char *p;
 
-	if ((ebuf = readEditedFile(ed_temp)) != 0) {
+	if ((ebuf = readEditedFile(ed_temp)) != NULL) {
 	    /*
 	     * Only use the first line of the result.
 	     */
@@ -13768,12 +13768,12 @@ int HText_InsertFile(LinkInfo *form_link)
 
     HTLine *htline = NULL;
 
-    TextAnchor *a = 0;
-    FormInfo *f = 0;
-    HTLine *l = 0;
+    TextAnchor *a = NULL;
+    FormInfo *f = NULL;
+    HTLine *l = NULL;
 
-    char *fbuf = 0;
-    char *line = 0;
+    char *fbuf = NULL;
+    char *line = NULL;
     char *lp;
     char *cp;
     int entry_line = form_link->anchor_line_num;
@@ -13833,7 +13833,7 @@ int HText_InsertFile(LinkInfo *form_link)
 	 * correct this by editing the lines, which will update f->value_cs
 	 * again. - kw
 	 */
-	LYGetFileInfo(fn, 0, 0, 0, 0, 0, &file_cs);
+	LYGetFileInfo(fn, NULL, NULL, NULL, NULL, NULL, &file_cs);
 
 	fp = fopen(fn, "r");
 	if (!fp) {
@@ -13973,7 +13973,7 @@ int HText_InsertFile(LinkInfo *form_link)
      *
      * Begin with the new line/anchor we just added (above the cursorline).
      */
-    if ((line = typeMallocn(char, MAX_LINE)) == 0)
+    if ((line = typeMallocn(char, MAX_LINE)) == NULL)
 	  outofmem(__FILE__, "HText_InsertFile");
 
     match_tag = anchor_ptr->number;
@@ -13982,7 +13982,7 @@ int HText_InsertFile(LinkInfo *form_link)
 
     while (*lp) {
 
-	if ((cp = StrChr(lp, '\n')) != 0)
+	if ((cp = StrChr(lp, '\n')) != NULL)
 	    len = (int) (cp - lp);
 	else
 	    len = (int) strlen(lp);
@@ -14334,7 +14334,7 @@ static void move_to_glyph(int YP,
      * Add offset, making sure that we do not
      * go over the COLS limit on the display.
      */
-    if (hightext != 0) {
+    if (hightext != NULL) {
 #ifdef WIDEC_CURSES
 	last_i = i + LYstrExtent2(data, datasize);
 #endif
@@ -15046,10 +15046,10 @@ static int LYHandleCache(const char *arg,
 	 */
 	HText *cachedoc = (HText *) HTList_objectAt(loaded_texts, x);
 
-	if (cachedoc != 0) {
+	if (cachedoc != NULL) {
 	    HTParentAnchor *docanchor = cachedoc->node_anchor;
 
-	    if (docanchor != 0) {
+	    if (docanchor != NULL) {
 #ifdef USE_SOURCE_CACHE
 		source_cache_file = docanchor->source_cache_file;
 #endif
@@ -15193,6 +15193,6 @@ static int LYHandleCache(const char *arg,
 GLOBALDEF(HTProtocol, LYLynxCache, _LYCACHE_C_GLOBALDEF_1_INIT);
 #else
 GLOBALDEF HTProtocol LYLynxCache =
-{"LYNXCACHE", LYHandleCache, 0};
+{"LYNXCACHE", LYHandleCache, NULL};
 #endif /* GLOBALDEF_IS_MACRO */
 #endif /* USE_CACHEJAR */

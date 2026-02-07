@@ -1,5 +1,5 @@
 /*
- * $LynxId: UCAuto.c,v 1.56 2021/06/09 22:29:43 tom Exp $
+ * $LynxId: UCAuto.c,v 1.58 2025/07/22 19:50:31 tom Exp $
  *
  *  This file contains code for changing the Linux console mode.
  *  Currently some names for font files are hardwired in here.
@@ -132,7 +132,7 @@ static int call_setfont(const char *font,
      * console-data package has only a few unicode maps.
      */
     if (!isSetFont())
-	umap = 0;
+	umap = NULL;
 
     if ((font && T_font_fn && !strcmp(font, T_font_fn))
 	&& (umap && T_umap_fn && !strcmp(umap, T_umap_fn))) {
@@ -262,7 +262,7 @@ void UCChangeTerminalCodepage(int newcs,
     /*
      * Restore the original character set.
      */
-    if (newcs < 0 || p == 0) {
+    if (newcs < 0 || p == NULL) {
 	if (non_empty(old_font) &&
 	    non_empty(old_umap)) {
 
@@ -288,7 +288,7 @@ void UCChangeTerminalCodepage(int newcs,
 		FREE(tmpbuf1);
 	    }
 	}
-	if (newcs < 0 && p == 0) {
+	if (newcs < 0 && p == NULL) {
 	    if (old_font) {
 		(void) LYRemoveTemp(old_font);
 		FREE(old_font);
@@ -303,17 +303,17 @@ void UCChangeTerminalCodepage(int newcs,
 	    }
 	}
 	return;
-    } else if (lastcs < 0 && old_umap == 0 && old_font == 0) {
+    } else if (lastcs < 0 && old_umap == NULL && old_font == NULL) {
 	FILE *fp1;
 	FILE *fp2 = NULL;
 
-	if ((old_font = typecallocn(char, LY_MAXPATH)) != 0)
+	if ((old_font = typecallocn(char, LY_MAXPATH)) != NULL)
 	      old_umap = typecallocn(char, LY_MAXPATH);
 
 	if (old_font == NULL)
 	    outofmem(__FILE__, "UCChangeTerminalCodepage");
 
-	if ((fp1 = LYOpenTemp(old_font, ".fnt", BIN_W)) != 0)
+	if ((fp1 = LYOpenTemp(old_font, ".fnt", BIN_W)) != NULL)
 	    fp2 = LYOpenTemp(old_umap, ".uni", BIN_W);
 
 	if (fp1 && fp2) {
@@ -605,7 +605,7 @@ int Find_Best_Display_Charset(int ord)
 	    return ord;		/* OK to find nothing */
 	if (!*s) {
 	    sprintf(buf,
-		    gettext("No destination for '%.80s' in CHARSET_SWITCH_RULES"),
+		    LY_MSG("No destination for '%.80s' in CHARSET_SWITCH_RULES"),
 		    name);
 	    HTInfoMsg(buf);
 	    return ord;
@@ -640,7 +640,7 @@ int Find_Best_Display_Charset(int ord)
     n = UCGetLYhndl_byMIME(buf);
     if (n < 0) {
 	sprintf(buf,
-		gettext("Unknown charset name '%.*s' in CHARSET_SWITCH_RULES"),
+		LY_MSG("Unknown charset name '%.*s' in CHARSET_SWITCH_RULES"),
 		s - r, r);
 	HTInfoMsg(buf);
 	return ord;
@@ -694,7 +694,7 @@ static int _Switch_Display_Charset(int ord, enum switch_display_charset_t really
 	if (rc == 0)
 	    goto report;
       err:
-	sprintf(msgbuf, gettext("Can't change to '%s': err=%#x=%d"), name, rc, rc);
+	sprintf(msgbuf, LY_MSG("Can't change to '%s': err=%#x=%d"), name, rc, rc);
 	HTInfoMsg(msgbuf);
 	return -1;
     }
@@ -732,7 +732,7 @@ static int _Switch_Display_Charset(int ord, enum switch_display_charset_t really
 	rc = VioGetFont(font, 0);	/* Retrieve data for current font */
 	if (rc) {
 	    sprintf(msgbuf,
-		    gettext("Can't fetch current font info: err=%#x=%d"), rc, rc);
+		    LY_MSG("Can't fetch current font info: err=%#x=%d"), rc, rc);
 	    HTInfoMsg(msgbuf);
 	    ord = ord1 = auto_display_charset;
 	    goto retry;
@@ -748,7 +748,7 @@ static int _Switch_Display_Charset(int ord, enum switch_display_charset_t really
 		charsets_directory, font->cyCell, font->cxCell, name);
 	file = fopen(fnamebuf, BIN_R);
 	if (!file) {
-	    sprintf(msgbuf, gettext("Can't open font file '%s'"), fnamebuf);
+	    sprintf(msgbuf, LY_MSG("Can't open font file '%s'"), fnamebuf);
 	    HTInfoMsg(msgbuf);
 	    ord = ord1 = auto_display_charset;
 	    goto retry;
@@ -757,7 +757,7 @@ static int _Switch_Display_Charset(int ord, enum switch_display_charset_t really
 	fseek(file, 0, SEEK_END);
 	if (ftell(file) - i != font->cbData) {
 	    fclose(file);
-	    sprintf(msgbuf, gettext("Mismatch of size of font file '%s'"), fnamebuf);
+	    sprintf(msgbuf, LY_MSG("Mismatch of size of font file '%s'"), fnamebuf);
 	    HTAlert(msgbuf);
 	    ord = ord1 = auto_display_charset;
 	    goto retry;
@@ -767,7 +767,7 @@ static int _Switch_Display_Charset(int ord, enum switch_display_charset_t really
 	fclose(file);
 	rc = VioSetFont(font, 0);	/* Put it all back.. */
 	if (rc) {
-	    sprintf(msgbuf, gettext("Can't set font: err=%#x=%d"), rc, rc);
+	    sprintf(msgbuf, LY_MSG("Can't set font: err=%#x=%d"), rc, rc);
 	    HTInfoMsg(msgbuf);
 	    ord = ord1 = auto_display_charset;
 	    font_loaded_for = -1;

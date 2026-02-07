@@ -1,5 +1,5 @@
 /*
- * $LynxId: LYNews.c,v 1.62 2018/03/18 18:51:02 tom Exp $
+ * $LynxId: LYNews.c,v 1.65 2025/06/19 22:04:17 tom Exp $
  */
 #include <HTUtils.h>
 #ifndef DISABLE_NEWS
@@ -145,7 +145,7 @@ char *LYNewsPost(char *newsgroups,
     }
 
     /*
-     * The newsgroups could be a comma-seperated list.  It need not have
+     * The newsgroups could be a comma-separated list.  It need not have
      * spaces, but deal with any that may also have been hex escaped.  - FM
      */
     StrAllocCopy(NewsGroups, newsgroups);
@@ -262,7 +262,7 @@ char *LYNewsPost(char *newsgroups,
     }
 #ifdef UNIX
     else if ((fp = fopen("/etc/organization", TXT_R)) != NULL) {
-	char *buffer = 0;
+	char *buffer = NULL;
 
 	if (LYSafeGets(&buffer, fp) != NULL) {
 	    if (user_input[0] != '\0') {
@@ -331,7 +331,7 @@ char *LYNewsPost(char *newsgroups,
 		_statusline(INC_ORIG_MSG_PROMPT);
 	    } else if (HTConfirm(INC_ORIG_MSG_PROMPT) == YES) {
 		/*
-		 * The 'TRUE' will add the reply ">" in front of every line. 
+		 * The 'TRUE' will add the reply ">" in front of every line.
 		 * We're assuming that if the display character set is Japanese
 		 * and the document did not have a CJK charset, any non-EUC or
 		 * non-SJIS 8-bit characters in it where converted to 7-bit
@@ -354,7 +354,7 @@ char *LYNewsPost(char *newsgroups,
 
     } else {
 	/*
-	 * Use the built in line editior.
+	 * Use the built in line editor.
 	 */
 	LYaddstr(gettext("\n\n Please enter your message below."));
 	LYaddstr(gettext("\n When you are done, press enter and put a single period (.)"));
@@ -391,7 +391,7 @@ char *LYNewsPost(char *newsgroups,
 
     if (nonempty) {
 	/*
-	 * Confirm whether to post, and if so, whether to append the sig file. 
+	 * Confirm whether to post, and if so, whether to append the sig file.
 	 * - FM
 	 */
 	LYStatusLine = (LYlines - 1);

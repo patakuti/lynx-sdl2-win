@@ -1,4 +1,4 @@
-/* $LynxId: LYCurses.c,v 1.209 2024/04/16 21:43:44 tom Exp $ */
+/* $LynxId: LYCurses.c,v 1.212 2025/07/27 21:21:50 tom Exp $ */
 #include <HTUtils.h>
 #include <HTAlert.h>
 
@@ -72,7 +72,7 @@ char *XCursesProgramName = "Lynx";
 #endif
 
 #ifdef USE_CURSES_PADS
-WINDOW *LYwin = 0;
+WINDOW *LYwin = NULL;
 int LYshiftWin = 0;
 int LYwideLines = FALSE;
 int LYtableCols = 0;		/* in 1/12 of screen width */
@@ -722,7 +722,7 @@ char *LYgetTableString(int code)
     int fg = lynx_color_pairs[pair].fg;
     int bg = lynx_color_pairs[pair].bg;
     unsigned n;
-    char *result = 0;
+    char *result = NULL;
 
     CTRACE((tfp, "LYgetTableString(%d)\n", code));
 
@@ -738,12 +738,12 @@ char *LYgetTableString(int code)
 
     for (n = 0; n < TABLESIZE(Mono_Attrs); ++n) {
 	if ((Mono_Attrs[n].code & mono) != 0) {
-	    if (result != 0)
+	    if (result != NULL)
 		StrAllocCat(result, "+");
 	    StrAllocCat(result, Mono_Attrs[n].name);
 	}
     }
-    if (result == 0)
+    if (result == NULL)
 	StrAllocCopy(result, "normal");
     StrAllocCat(result, ":");
     StrAllocCat(result, lookup_color(fg));
@@ -1831,7 +1831,7 @@ void lynx_nl2crlf(int normal GCC_UNUSED)
     static int can_fix = TRUE;
 
     if (!did_save) {
-	if (cur_term == 0) {
+	if (cur_term == NULL) {
 	    can_fix = FALSE;
 	} else {
 	    tcgetattr(fileno(stdout), &saved_tty);
@@ -2053,7 +2053,7 @@ BOOLEAN setup(char *terminal)
 	printf("\n\n  %s\n\n", gettext("Your Terminal type is unknown!"));
 	printf("  %s [vt100] ", gettext("Enter a terminal type:"));
 
-	if (LYSafeGets(&buffer, stdin) != 0) {
+	if (LYSafeGets(&buffer, stdin) != NULL) {
 	    LYTrimLeading(buffer);
 	    LYTrimTrailing(buffer);
 	}
@@ -2191,7 +2191,7 @@ void LYpaddstr(WINDOW * the_window, int width, const char *the_string)
  */
 void LYsubwindow(WINDOW * param)
 {
-    if (param != 0) {
+    if (param != NULL) {
 	my_subwindow = param;
 #if defined(NCURSES) || defined(PDCURSES)
 	keypad(my_subwindow, TRUE);
@@ -2211,7 +2211,7 @@ void LYsubwindow(WINDOW * param)
     } else {
 	touchwin(LYwin);
 	delwin(my_subwindow);
-	my_subwindow = 0;
+	my_subwindow = NULL;
     }
 }
 
@@ -2226,7 +2226,7 @@ WINDOW *LYstartPopup(int *top_y,
 		     int *height,
 		     int *width)
 {
-    WINDOW *form_window = 0;
+    WINDOW *form_window = NULL;
 
 #ifdef USE_SLANG
     static WINDOW fake_window;
@@ -2249,7 +2249,7 @@ WINDOW *LYstartPopup(int *top_y,
 #else
     if (*left_x > 0 && (*left_x + *width + 4) < LYcolLimit)
 	form_window = newwin(*height, *width + 4, *top_y, *left_x - 1);
-    if (form_window == 0) {
+    if (form_window == NULL) {
 	if (*width > LYcolLimit - 4) {
 	    *width = LYcolLimit - 4;
 	    *left_x = 1;
@@ -2260,7 +2260,7 @@ WINDOW *LYstartPopup(int *top_y,
 	}
 	form_window = newwin(*height, *width + 4, *top_y, *left_x - 1);
     }
-    if (form_window == 0) {
+    if (form_window == NULL) {
 	HTAlert(POPUP_FAILED);
     } else {
 	LYsubwindow(form_window);
@@ -2343,7 +2343,7 @@ void LYwaddnstr(WINDOW * w GCC_UNUSED,
 #ifdef USE_CURSES_PADS
     /*
      * If we've configured to use pads for left/right scrolling, that can
-     * interfere with calls to this function that assume they're wrapping. 
+     * interfere with calls to this function that assume they're wrapping.
      * Writing to a pad which is wider than the screen will simply not wrap.
      *
      * Link-highlighting uses wrapping.  You can see this by viewing the
@@ -2365,7 +2365,7 @@ void LYwaddnstr(WINDOW * w GCC_UNUSED,
 	&& (x0 < LYcolLimit)) {
 	WINDOW *sub = derwin(LYwin, LYlines, LYcolLimit, 0, 0);
 
-	if (sub != 0) {
+	if (sub != NULL) {
 	    wmove(sub, y0, x0);
 	    LYwideLines = TRUE;
 	    LYwaddnstr(sub, src, len);
@@ -2517,15 +2517,15 @@ int LYstrExtent0(const char *string,
     if (non_empty(string) && used > 0 && lynx_called_initscr) {
 	if (fake_max < maxCells) {
 	    fake_max = (maxCells + 1) * 2;
-	    if (fake_win != 0) {
+	    if (fake_win != NULL) {
 		delwin(fake_win);
-		fake_win = 0;
+		fake_win = NULL;
 	    }
 	}
-	if (fake_win == 0) {
+	if (fake_win == NULL) {
 	    fake_win = newwin(2, fake_max, 0, 0);
 	}
-	if (fake_win != 0) {
+	if (fake_win != NULL) {
 	    int new_x = 0;
 	    int new_y = 0;
 	    int x = 0;
@@ -2703,10 +2703,10 @@ void VMSexit(void)
     if (!DidCleanup) {
 	if (LYOutOfMemory == FALSE) {
 	    fprintf(stderr,
-		    gettext("\nA Fatal error has occurred in %s Ver. %s\n"),
+		    LY_MSG("\nA Fatal error has occurred in %s Ver. %s\n"),
 		    LYNX_NAME, LYNX_VERSION);
 	    fprintf(stderr,
-		    gettext("\nPlease notify your system administrator to confirm a bug, and if\n\
+		    LY_MSG("\nPlease notify your system administrator to confirm a bug, and if\n\
 confirmed, to notify the lynx-dev list.  Bug reports should have concise\n\
 descriptions of the command and/or URL which causes the problem, the\n\
 operating system name with version number, the TCPIP implementation, the\n\
@@ -3183,7 +3183,7 @@ void LYrefresh(void)
 	 * Keep a popup window visible.  This can happen if the user presses
 	 * '/' to do a search within a popup.
 	 */
-	if (my_subwindow != 0) {
+	if (my_subwindow != NULL) {
 	    touchwin(my_subwindow);
 	    wnoutrefresh(my_subwindow);
 	}

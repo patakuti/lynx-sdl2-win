@@ -1,4 +1,4 @@
-dnl $LynxId: configure.in,v 1.374 2024/05/31 22:09:16 tom Exp $
+dnl $LynxId: configure.in,v 1.411 2025/09/17 22:50:45 tom Exp $
 dnl
 dnl Process this file with autoconf to produce a configure script.
 dnl
@@ -7,30 +7,37 @@ dnl by T.E.Dickey <dickey@invisible-island.net>
 dnl and Jim Spath <jspath@mail.bcpl.lib.md.us>
 dnl
 dnl ---------------------------------------------------------------------------
-dnl Copyright 1997-2023,2024 by Thomas E. Dickey
+dnl Copyright 1997-2024,2025 by Thomas E. Dickey
 dnl
-dnl Permission to use, copy, modify, and distribute this software and its
-dnl documentation for any purpose and without fee is hereby granted,
-dnl provided that the above copyright notice appear in all copies and that
-dnl both that copyright notice and this permission notice appear in
-dnl supporting documentation, and that the name of the above listed
-dnl copyright holder(s) not be used in advertising or publicity pertaining
-dnl to distribution of the software without specific, written prior
-dnl permission.
+dnl Permission is hereby granted, free of charge, to any person obtaining a
+dnl copy of this software and associated documentation files (the
+dnl "Software"), to deal in the Software without restriction, including
+dnl without limitation the rights to use, copy, modify, merge, publish,
+dnl distribute, sublicense, and/or sell copies of the Software, and to
+dnl permit persons to whom the Software is furnished to do so, subject to
+dnl the following conditions:
 dnl
-dnl THE ABOVE LISTED COPYRIGHT HOLDER(S) DISCLAIM ALL WARRANTIES WITH REGARD
-dnl TO THIS SOFTWARE, INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
-dnl AND FITNESS, IN NO EVENT SHALL THE ABOVE LISTED COPYRIGHT HOLDER(S) BE
-dnl LIABLE FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
-dnl WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
-dnl ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
-dnl OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+dnl The above copyright notice and this permission notice shall be included
+dnl in all copies or substantial portions of the Software.
+dnl
+dnl THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+dnl OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+dnl MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+dnl IN NO EVENT SHALL THE ABOVE LISTED COPYRIGHT HOLDER(S) BE LIABLE FOR ANY
+dnl CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+dnl TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+dnl SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+dnl
+dnl Except as contained in this notice, the name(s) of the above copyright
+dnl holders shall not be used in advertising or otherwise to promote the
+dnl sale, use or other dealings in this Software without prior written
+dnl authorization.
 dnl ---------------------------------------------------------------------------
 dnl
-AC_REVISION($Revision: 1.374 $)
+AC_REVISION($Revision: 1.411 $)
 
 AC_PREREQ(2.52.20231210)
-AC_INIT(lynx,2.9.2,lynx-dev@nongnu.org)
+AC_INIT(lynx,2.9.2u,lynx-dev@nongnu.org)
 
 AC_CONFIG_SRCDIR(userdefs.h)
 
@@ -112,7 +119,6 @@ AC_PROG_INSTALL
 AC_PROG_YACC
 AC_PROG_EGREP
 CF_PROG_LINT
-CF_MAKEFLAGS
 CF_MAKE_PHONY
 CF_MAKE_TAGS
 
@@ -346,6 +352,7 @@ esac
 CF_ANSI_CC_REQD
 CF_XOPEN_SOURCE(500,199506L)
 CF_LARGEFILE
+CF_LINK_PREFIX
 AC_CHECK_DECL(exit)
 
 dnl --------------------------------------------------------------------------
@@ -400,6 +407,7 @@ fi
 
 dnl --------------------------------------------------------------------------
 CF_SIGWINCH
+CF_PKG_CONFIG
 
 dnl Collect tests for compiler options into one place
 if test -n "$TRY_CFLAGS" ; then
@@ -412,13 +420,6 @@ dnl --------------------------------------------------------------------------
 
 ### Look for network libraries first, since some functions (such as gethostname)
 ### are used in a lot of places.
-AC_CACHE_CHECK(if you want NSS compatible SSL libraries,cf_cv_use_libnss_compat,[
-AC_ARG_WITH(nss-compat,
-	[  --with-nss-compat{=path}       link with nss_compat library if available],
-	[cf_cv_use_libnss_compat=$withval],
-	[cf_cv_use_libnss_compat=no])
-])
-
 AC_CACHE_CHECK(if you want ssl library,cf_cv_use_libssl,[
 AC_ARG_WITH(ssl,
 	[  --with-ssl{=path}       link with ssl library if available],
@@ -431,14 +432,6 @@ AC_ARG_WITH(gnutls,
 	[  --with-gnutls{=path}    link with gnutls support],
 	[cf_cv_use_libgnutls=$withval],
 	[cf_cv_use_libgnutls=no])
-])
-
-# this option is mainly for comparing with/without Lynx's wrapper for GNUTLS.
-AC_CACHE_CHECK(if you want gnutls-openssl compat,cf_cv_gnutls_compat,[
-AC_ARG_ENABLE(gnutls-compat,
-	[  --enable-gnutls-compat  link with gnutls-openssl compat],
-	[cf_cv_gnutls_compat=$enableval],
-	[cf_cv_gnutls_compat=no])
 ])
 
 AC_CACHE_CHECK(if you want socks library,cf_cv_use_libsocks,[
@@ -460,23 +453,21 @@ if test "x$cf_cv_use_libsocks" != xno ; then
 elif test "x$cf_cv_use_libsocks5" != xno ; then
 	CF_SOCKS5($cf_cv_use_libsocks5)
 else
+	cf_cv_socks_lib=no
 	CF_NETLIBS
+fi
+
+# dante(socks5) interferes with configure-checks
+if test "x$cf_cv_socks_lib" != xno ; then
+	LIBS=`echo "x$LIBS" | sed -e "s,x-l$cf_cv_socks_lib[ ][ ]*,,"`
 fi
 
 CF_INET_ADDR
 
-CF_PKG_CONFIG
-
 if test "x$cf_cv_use_libssl"  != xno ; then
 	CF_SSL($cf_cv_use_libssl)
 elif test "x$cf_cv_use_libgnutls" != xno ; then
-    if test "x$cf_cv_gnutls_compat" = xno ; then
-        CF_GNUTLS($cf_cv_use_libgnutls,tidy_tls\$o)
-    else
-        CF_GNUTLS($cf_cv_use_libgnutls)
-    fi
-elif test "x$cf_cv_use_libnss_compat"  != xno ; then
-	CF_NSS_COMPAT($cf_cv_use_libnss_compat)
+	CF_GNUTLS($cf_cv_use_libgnutls,tidy_tls\$o)
 fi
 
 dnl --------------------------------------------------------------------------
@@ -625,38 +616,6 @@ test "x$LYNX_CFG_PATH" = xno && LYNX_CFG_PATH=
 AC_DEFINE_UNQUOTED(LYNX_CFG_PATH,"$LYNX_CFG_PATH",[Define to default path for Lynx config-files])
 
 dnl --------------------------------------------------------------------------
-AC_MSG_CHECKING(if htmlized lynx.cfg should be built)
-CF_ARG_ENABLE(htmlized-cfg,
-[  --enable-htmlized-cfg   build htmlized lynx.cfg],
-	[use_htmlized_cfg=$enableval],
-	[use_htmlized_cfg=no])
-AC_MSG_RESULT($use_htmlized_cfg)
-
-LYNXCFG_MAKE=''
-LYNXCFG_NO_MAKE=''
-if test "$use_htmlized_cfg" = no ; then
-	LYNXCFG_MAKE='#'
-else
-	LYNXCFG_NO_MAKE='#'
-fi
-AC_SUBST(LYNXCFG_MAKE)
-AC_SUBST(LYNXCFG_NO_MAKE)
-
-dnl --------------------------------------------------------------------------
-AC_MSG_CHECKING(if local doc directory should be linked to help page)
-CF_ARG_ENABLE(local-docs,
-[  --enable-local-docs     link local doc-directory to help-page],
-	[use_local_docs=$enableval],
-	[use_local_docs=no])
-AC_MSG_RESULT($use_local_docs)
-
-LYNXDOC_MAKE=''
-if test "$use_local_docs" = no ; then
-	LYNXDOC_MAKE='#'
-fi
-AC_SUBST(LYNXDOC_MAKE)
-
-dnl --------------------------------------------------------------------------
 
 AC_MSG_CHECKING(for MIME library directory)
 CF_WITH_PATH(mime-libdir,
@@ -668,13 +627,52 @@ MIME_LIBDIR=`echo "$MIME_LIBDIR" | sed -e 's,/$,,' -e 's,$,/,'`
 AC_DEFINE_UNQUOTED(MIME_LIBDIR,"$MIME_LIBDIR",[Define to default path for MIME library])
 
 dnl --------------------------------------------------------------------------
+
+AC_MSG_CHECKING(for usable UTF-8 support)
+cf_full_locale=$use_wide_curses
+if test "$cf_full_locale" = yes; then
+	case $cf_cv_screen in
+	(ncurses*)
+		;;
+	(*)
+		cf_full_locale=no
+		;;
+	esac
+fi
+AC_MSG_RESULT($cf_full_locale)
+
+dnl --------------------------------------------------------------------------
 AC_MSG_CHECKING(if locale-charset selection logic should be used)
 CF_ARG_DISABLE(locale-charset,
 [  --disable-locale-charset use locale-charset selection logic],
 	[use_locale_charset=$enableval],
 	[use_locale_charset=yes])
 AC_MSG_RESULT($use_locale_charset)
-test "$use_locale_charset" != no && AC_DEFINE(USE_LOCALE_CHARSET,1,[Define to 1 if locale-charset selection logic should be used])
+if test "$use_locale_charset" != no; then
+	AC_DEFINE(USE_LOCALE_CHARSET,1,[Define to 1 if locale-charset selection logic should be used])
+	DEFAULT_LOCALE_CHARSET=FALSE
+	test $cf_full_locale = yes && DEFAULT_LOCALE_CHARSET=TRUE
+else
+	DEFAULT_LOCALE_CHARSET=DISABLED
+fi
+AC_DEFINE_UNQUOTED(DEFAULT_LOCALE_CHARSET,$DEFAULT_LOCALE_CHARSET,[Define to show the default value of locale_charset option])
+AC_SUBST(DEFAULT_LOCALE_CHARSET)
+
+dnl --------------------------------------------------------------------------
+AC_MSG_CHECKING(if wcwidth/UTF-8 logic should be used)
+CF_ARG_DISABLE(wcwidth-support,
+[  --enable-wcwidth-support use wcwidth/UTF-8 logic],
+	[use_wcwidth=$enableval],
+	[use_wcwidth=maybe])
+if test "$use_wcwidth" = maybe; then
+	if test "$cf_full_locale" != no; then
+		use_wcwidth=yes
+	else
+		use_wcwidth=no
+	fi
+fi
+AC_MSG_RESULT($use_wcwidth)
+test "$use_wcwidth" != no && AC_DEFINE(USE_WCWIDTH_SUPPORT,1,[Define to 1 if wcwidth/UTF-8 logic should be used])
 
 dnl --------------------------------------------------------------------------
 dnl Check for subsets of compiled-in tables.
@@ -775,6 +773,7 @@ CF_CHECK_SIZEOF(off_t,4)
 CF_CHECK_SIZEOF(size_t,4)
 CF_CHECK_SIZEOF(time_t,4)
 AC_CHECK_TYPE(intptr_t, long)
+CF_SOCKADDR_LEN
 
 dnl --------------------------------------------------------------------------
 dnl Checks for library units
@@ -971,15 +970,6 @@ fi
 else
 	CF_VERBOSE(skipping CJK features which depend on iconv)
 fi
-
-dnl --------------------------------------------------------------------------
-AC_MSG_CHECKING(if experimental wcwidth/UTF-8 logic should be used)
-CF_ARG_ENABLE(wcwidth-support,
-[  --enable-wcwidth-support use experimental wcwidth/UTF-8 logic],
-	[use_wcwidth=$enableval],
-	[use_wcwidth=no])
-AC_MSG_RESULT($use_wcwidth)
-test "$use_wcwidth" != no && AC_DEFINE(EXP_WCWIDTH_SUPPORT,1,[Define to 1 if experimental wcwidth/UTF-8 logic should be used])
 
 dnl --------------------------------------------------------------------------
 use_dft_colors=no
@@ -1275,12 +1265,54 @@ test "$use_underline" = yes && AC_DEFINE(UNDERLINE_LINKS,1,[Define to 1 if xxx])
 test "$use_underline" = no  && AC_DEFINE(UNDERLINE_LINKS,0,[Define to 0 if xxx])
 
 dnl --------------------------------------------------------------------------
+CF_HELP_MESSAGE(
+Documentation:)
+
+dnl --------------------------------------------------------------------------
+AC_MSG_CHECKING(if htmlized lynx.cfg should be built)
+CF_ARG_ENABLE(htmlized-cfg,
+[  --enable-htmlized-cfg   build htmlized lynx.cfg],
+	[use_htmlized_cfg=$enableval],
+	[use_htmlized_cfg=no])
+AC_MSG_RESULT($use_htmlized_cfg)
+
+LYNXCFG_MAKE=''
+LYNXCFG_NO_MAKE=''
+if test "$use_htmlized_cfg" = no ; then
+	LYNXCFG_MAKE='#'
+else
+	LYNXCFG_NO_MAKE='#'
+fi
+AC_SUBST(LYNXCFG_MAKE)
+AC_SUBST(LYNXCFG_NO_MAKE)
+
+dnl --------------------------------------------------------------------------
+AC_MSG_CHECKING(if local doc directory should be linked to help page)
+CF_ARG_ENABLE(local-docs,
+[  --enable-local-docs     link local doc-directory to help-page],
+	[use_local_docs=$enableval],
+	[use_local_docs=no])
+AC_MSG_RESULT($use_local_docs)
+
+LYNXDOC_MAKE=''
+if test "$use_local_docs" = no ; then
+	LYNXDOC_MAKE='#'
+fi
+AC_SUBST(LYNXDOC_MAKE)
+
+dnl --------------------------------------------------------------------------
 AC_MSG_CHECKING(if help files should be gzip'ed)
 CF_ARG_ENABLE(gzip-help,
 [  --enable-gzip-help      install gzip'ed help files],
 	[use_gzip_help=$enableval],
 	[use_gzip_help=no])
 AC_MSG_RESULT($use_gzip_help)
+
+CF_WITH_MAN2HTML
+
+dnl --------------------------------------------------------------------------
+CF_HELP_MESSAGE(
+Compression Libraries/Utilities:)
 
 dnl --------------------------------------------------------------------------
 AC_MSG_CHECKING(if you want to use libbz2 for decompression of some bzip2 files)
@@ -1319,6 +1351,19 @@ AC_MSG_RESULT($use_brotli)
 if test ".$use_brotli" != ".no" ; then
 	CF_WITH_BROTLI($use_brotli)
 	test "x$cf_cv_find_linkage_brotlidec" = "xyes" && AC_DEFINE(USE_BROTLI,1,[Define to 1 if you want to use libbrotli decompression])
+fi
+
+dnl --------------------------------------------------------------------------
+AC_MSG_CHECKING(if you want to use zstd decompression)
+AC_ARG_WITH(zstd,
+[  --with-zstd             use zstd decompression],
+	[use_zstd=$withval],
+	[use_zstd=yes])
+AC_MSG_RESULT($use_zstd)
+
+if test ".$use_zstd" != ".no" ; then
+	CF_WITH_ZSTD($use_zstd)
+	test "x$cf_cv_find_linkage_zstd" = "xyes" && AC_DEFINE(USE_ZSTD,1,[Define to 1 if you want to use libzstd decompression])
 fi
 
 dnl --------------------------------------------------------------------------
@@ -1469,6 +1514,7 @@ CF_PATH_PROG(UNCOMPRESS,gunzip)
 CF_PATH_PROG(UNZIP,	unzip)
 CF_PATH_PROG(BZIP2,	bzip2)
 CF_PATH_PROG(BROTLI,	brotli)
+CF_PATH_PROG(ZSTD,	zstd)
 
 CF_PATH_PROG(TAR,	tar, pax gtar gnutar bsdtar star)
 CF_TAR_OPTIONS($TAR)
@@ -1592,6 +1638,10 @@ CF_DISABLE_RPATH_HACK
 
 CF_MERGE_EXTRA_CFLAGS
 
+if test "x$cf_cv_socks_lib" != xno ; then
+	CF_ADD_LIBS(-l$cf_cv_socks_lib)
+fi
+
 ### Finally, build config.h and the makefiles
 test -z "$CONFIG_SHELL" && CONFIG_SHELL=/bin/sh
 AC_SUBST(CONFIG_SHELL)
@@ -1634,3 +1684,4 @@ AC_OUTPUT(
 	use_our_messages=$use_our_messages
 	]
 )
+CF_MAKE_DOCS(lynx,man)

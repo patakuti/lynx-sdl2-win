@@ -1,5 +1,5 @@
 /*
- * $LynxId: LYMain.c,v 1.301 2024/03/17 23:10:41 tom Exp $
+ * $LynxId: LYMain.c,v 1.307 2025/08/03 21:51:26 tom Exp $
  */
 #include <HTUtils.h>
 #include <HTTP.h>
@@ -617,7 +617,7 @@ int justify_max_void_percent = 35;
 #endif
 
 #ifdef USE_LOCALE_CHARSET
-BOOLEAN LYLocaleCharset = FALSE;
+BOOLEAN LYLocaleCharset = DEFAULT_LOCALE_CHARSET;
 #endif
 BOOLEAN assumed_charset = FALSE;
 
@@ -689,7 +689,7 @@ HTList *positionable_editor = NULL;
 #endif
 
 #if EXTENDED_STARTFILE_RECALL
-static char *nonoption = 0;
+static char *nonoption = NULL;
 #endif
 
 #ifndef OPTNAME_ALLOW_DASHES
@@ -939,7 +939,7 @@ static void FixCharacters(void)
 static BOOL GetStdin(char **buf,
 		     int marker)
 {
-    if (LYSafeGets(buf, stdin) != 0
+    if (LYSafeGets(buf, stdin) != NULL
 	&& (!marker || StrNCmp(*buf, "---", 3) != 0)) {
 	LYTrimTrailing(*buf);
 	CTRACE((tfp, "...data: %s\n", *buf));
@@ -1006,7 +1006,7 @@ void LYSetTextDomain(void)
 #if defined(HAVE_LIBINTL_H)
     const char *cp;
 
-    if ((cp = LYGetEnv("LYNX_LOCALEDIR")) == 0) {
+    if ((cp = LYGetEnv("LYNX_LOCALEDIR")) == NULL) {
 #ifdef USE_PROGRAM_DIR
 	char *localedir = NULL;
 
@@ -1068,7 +1068,7 @@ int main(int argc,
     /*
      * Register the final function to be executed when being exited.  Will
      * display memory leaks if the -find-leaks option is used.  This should
-     * be the first call to atexit() for leak-checking, which ensures that 
+     * be the first call to atexit() for leak-checking, which ensures that
      * all of the other functions will be invoked before LYLeaks().
      */
     atexit(LYLeaks);
@@ -1182,7 +1182,7 @@ int main(int argc,
      * that and exit.  - FM
      */
 #ifndef NO_LYNX_TRACE
-    if (LYGetEnv("LYNX_TRACE") != 0) {
+    if (LYGetEnv("LYNX_TRACE") != NULL) {
 	WWW_TraceFlag = TRUE;
     }
 #endif
@@ -1190,7 +1190,7 @@ int main(int argc,
     /*
      * Set up the TRACE log path, and logging if appropriate.  - FM
      */
-    if ((ccp = LYGetEnv("LYNX_TRACE_FILE")) == 0)
+    if ((ccp = LYGetEnv("LYNX_TRACE_FILE")) == NULL)
 	ccp = FNAME_LYNX_TRACE;
     LYTraceLogPath = typeMallocn(char, LY_MAXPATH);
 
@@ -1551,7 +1551,7 @@ int main(int argc,
      */
     if (!LYCanReadFile(lynx_cfg_file)) {
 	fprintf(stderr,
-		gettext("\nConfiguration file \"%s\" is not available.\n\n"),
+		LY_MSG("\nConfiguration file \"%s\" is not available.\n\n"),
 		lynx_cfg_file);
 	exit_immediately(EXIT_FAILURE);
     }
@@ -1561,7 +1561,7 @@ int main(int argc,
      * CHARTRANS handling.  - KW
      */
     if (!LYCharSetsDeclared()) {
-	fprintf(stderr, gettext("\nLynx character sets not declared.\n\n"));
+	fputs(gettext("\nLynx character sets not declared.\n\n"), stderr);
 	exit_immediately(EXIT_FAILURE);
     }
     /*
@@ -1597,7 +1597,7 @@ int main(int argc,
      * Set the original directory, used for default download
      */
     if (!strcmp(Current_Dir(filename), ".")) {
-	if ((cp = LYGetEnv("PWD")) != 0)
+	if ((cp = LYGetEnv("PWD")) != NULL)
 	    StrAllocCopy(original_dir, cp);
     } else {
 	StrAllocCopy(original_dir, filename);
@@ -1721,9 +1721,8 @@ int main(int argc,
 	}
 	if (ignored) {
 	    fprintf(stderr,
-		    gettext("Ignored %d characters from standard input.\n"), ignored);
-	    fprintf(stderr,
-		    gettext("Use \"-stdin\" or \"-\" to tell how to handle piped input.\n"));
+		    LY_MSG("Ignored %d characters from standard input.\n"), ignored);
+	    fputs(gettext("Use \"-stdin\" or \"-\" to tell how to handle piped input.\n"), stderr);
 	}
     }
 #endif /* HAVE_TTYNAME */
@@ -1744,7 +1743,7 @@ int main(int argc,
 	char *buf = NULL;
 
 	CTRACE((tfp, "processing stdin startfile\n"));
-	if ((fp = LYOpenTemp(result, HTML_SUFFIX, "w")) != 0) {
+	if ((fp = LYOpenTemp(result, HTML_SUFFIX, "w")) != NULL) {
 	    StrAllocCopy(startfile, result);
 	    while (GetStdin(&buf, FALSE)) {
 		fputs(buf, fp);
@@ -2621,7 +2620,7 @@ static int base_fun(char *next_arg GCC_UNUSED)
 /* -cache */
 static int cache_fun(char *next_arg)
 {
-    if (next_arg != 0)
+    if (next_arg != NULL)
 	HTCacheSize = atoi(next_arg);
     /*
      * Limit size.
@@ -2664,7 +2663,7 @@ static int color_fun(char *next_arg GCC_UNUSED)
 /* -convert_to */
 static int convert_to_fun(char *next_arg)
 {
-    if (next_arg != 0) {
+    if (next_arg != NULL) {
 	char *outformat = NULL;
 	char *cp1, *cp2, *cp4;
 	int chndl;
@@ -2688,7 +2687,7 @@ static int convert_to_fun(char *next_arg)
 		    chndl = UCLYhndl_for_unrec;
 		if (chndl < 0) {
 		    fprintf(stderr,
-			    gettext("Lynx: ignoring unrecognized charset=%s\n"), cp2);
+			    LY_MSG("Lynx: ignoring unrecognized charset=%s\n"), cp2);
 		} else {
 		    current_char_set = chndl;
 		}
@@ -2714,7 +2713,7 @@ static int crawl_fun(char *next_arg GCC_UNUSED)
 /* -display */
 static int display_fun(char *next_arg)
 {
-    if (next_arg != 0) {
+    if (next_arg != NULL) {
 	LYsetXDisplay(next_arg);
     }
 
@@ -2732,7 +2731,7 @@ static int display_charset_fun(char *next_arg)
 #endif
     if (i < 0) {		/* do nothing here: so fallback to lynx.cfg */
 	fprintf(stderr,
-		gettext("Lynx: ignoring unrecognized charset=%s\n"), next_arg);
+		LY_MSG("Lynx: ignoring unrecognized charset=%s\n"), next_arg);
     } else
 	current_char_set = i;
     return 0;
@@ -2748,7 +2747,7 @@ static int dump_output_fun(char *next_arg GCC_UNUSED)
 /* -editor */
 static int editor_fun(char *next_arg)
 {
-    if (next_arg != 0)
+    if (next_arg != NULL)
 	StrAllocCopy(editor, next_arg);
     system_editor = TRUE;
     return 0;
@@ -2760,7 +2759,7 @@ static int error_file_fun(char *next_arg)
     /*
      * Output return (success/failure) code of an HTTP transaction.
      */
-    if (next_arg != 0)
+    if (next_arg != NULL)
 	http_error_file = next_arg;
     return 0;
 }
@@ -2833,7 +2832,7 @@ int hiddenlinks_fun(char *next_arg)
     };
     /* *INDENT-ON* */
 
-    if (next_arg != 0) {
+    if (next_arg != NULL) {
 	if (!LYgetEnum(table, next_arg, &LYHiddenLinks))
 	    print_help_and_exit(-1);
     } else {
@@ -2846,7 +2845,7 @@ int hiddenlinks_fun(char *next_arg)
 /* -homepage */
 static int homepage_fun(char *next_arg)
 {
-    if (next_arg != 0) {
+    if (next_arg != NULL) {
 	StrAllocCopy(homepage, next_arg);
 	LYEscapeStartfile(&homepage);
     }
@@ -2871,7 +2870,7 @@ static int mime_header_fun(char *next_arg GCC_UNUSED)
 /* -newschunksize */
 static int newschunksize_fun(char *next_arg)
 {
-    if (next_arg != 0) {
+    if (next_arg != NULL) {
 	HTNewsChunkSize = atoi(next_arg);
 	/*
 	 * If the new HTNewsChunkSize exceeds the maximum,
@@ -2956,7 +2955,7 @@ static int nounderline_fun(char *next_arg GCC_UNUSED)
 static int nozap_fun(char *next_arg)
 {
     LYNoZapKey = 1;		/* everything but "initially" treated as "full" - kw */
-    if (next_arg != 0) {
+    if (next_arg != NULL) {
 	if (strcasecomp(next_arg, "initially") == 0)
 	    LYNoZapKey = 2;
 
@@ -3005,7 +3004,7 @@ static int post_data_fun(char *next_arg GCC_UNUSED)
 
 static const char *show_restriction(const char *name)
 {
-    const char *value = 0;
+    const char *value = NULL;
 
     switch (find_restriction(name, -1)) {
     case TRUE:
@@ -3174,7 +3173,7 @@ G)oto's" },
 	first = TRUE;
 	for (j = 0; j < TABLESIZE(table); j++) {
 	    found = FALSE;
-	    if ((name = index_to_restriction(j)) == 0) {
+	    if ((name = index_to_restriction(j)) == NULL) {
 		break;
 	    }
 	    for (k = 0; k < TABLESIZE(table); k++) {
@@ -3249,7 +3248,7 @@ static int version_fun(char *next_arg GCC_UNUSED)
     SetLocale();
     SetOutputMode(O_TEXT);
 
-    HTSprintf0(&result, gettext("%s Version %s (%s)"),
+    HTSprintf0(&result, LY_MSG("%s Version %s (%s)"),
 	       LYNX_NAME, LYNX_VERSION,
 	       LYVersionDate());
 
@@ -3290,7 +3289,7 @@ static int version_fun(char *next_arg GCC_UNUSED)
  * systems, according to predefined compiler symbols.
  */
 #ifdef SYSTEM_NAME
-    printf(gettext("Built on %s%s.\n"), SYSTEM_NAME, BUILDSTAMP);
+    printf(LY_MSG("Built on %s%s.\n"), SYSTEM_NAME, BUILDSTAMP);
 #elif defined(__CYGWIN__)
     printf("Compiled by CYGWIN%s.\n", BUILDSTAMP);
 #elif defined(__BORLANDC__)
@@ -3326,7 +3325,7 @@ static int version_fun(char *next_arg GCC_UNUSED)
 /* -width */
 static int width_fun(char *next_arg)
 {
-    if (next_arg != 0) {
+    if (next_arg != NULL) {
 	int w = atoi(next_arg);
 
 	if (w > 0)
@@ -4132,7 +4131,7 @@ static void print_help_strings(const char *name,
 	first = pad;
     }
 
-    if (StrChr(help, '\n') == 0) {
+    if (StrChr(help, '\n') == NULL) {
 	fprintf(stdout, "%s", help);
     } else {
 	while ((c = *help) != 0) {
@@ -4166,8 +4165,8 @@ static void print_help_and_exit(int exit_status)
 
     SetOutputMode(O_TEXT);
 
-    fprintf(stdout, gettext("USAGE: %s [options] [file]\n"), pgm);
-    fprintf(stdout, gettext("Options are:\n"));
+    fprintf(stdout, LY_MSG("USAGE: %s [options] [file]\n"), pgm);
+    fputs(gettext("Options are:\n"), stdout);
 #ifdef VMS
     print_help_strings("",
 		       "receive the arguments from stdin (enclose\n\
@@ -4176,7 +4175,7 @@ in double-quotes (\"-\") on VMS)", NULL, TRUE);
     print_help_strings("", "receive options and arguments from stdin", NULL, TRUE);
 #endif /* VMS */
 
-    for (p = Arg_Table; p->name != 0; p++) {
+    for (p = Arg_Table; p->name != NULL; p++) {
 	char temp[LINESIZE], *value = temp;
 	ParseUnionPtr q = ParseUnionOf(p);
 
@@ -4195,12 +4194,12 @@ in double-quotes (\"-\") on VMS)", NULL, TRUE);
 	    sprintf(temp, SECS_FMT, (double) Secs2SECS(*(q->int_value)));
 	    break;
 	case STRING_ARG:
-	    if ((value = *(q->str_value)) != 0
+	    if ((value = *(q->str_value)) != NULL
 		&& !*value)
-		value = 0;
+		value = NULL;
 	    break;
 	default:
-	    value = 0;
+	    value = NULL;
 	    break;
 	}
 	print_help_strings(p->name, p->help_string, value, TRUE);
@@ -4302,10 +4301,10 @@ static BOOL parse_arg(char **argv,
 	    arg_name, mask, countp ? *countp : -1));
 
 #if EXTENDED_STARTFILE_RECALL
-    if (mask == (unsigned) ((countp != 0) ? 0 : 1)) {
+    if (mask == (unsigned) ((countp != NULL) ? 0 : 1)) {
 	no_options_further = FALSE;
 	/* want to reset nonoption when beginning scan for --stdin */
-	if (nonoption != 0) {
+	if (nonoption != NULL) {
 	    FREE(nonoption);
 	}
     }
@@ -4317,7 +4316,7 @@ static BOOL parse_arg(char **argv,
     if (*arg_name != '-'
 #if EXTENDED_OPTION_LOGIC
 	|| ((no_options_further == TRUE)
-	    && (countp != 0)
+	    && (countp != NULL)
 	    && (nof_index < (*countp)))
 #endif
 	) {
@@ -4327,7 +4326,7 @@ static BOOL parse_arg(char **argv,
 	 * provide G)oto history for multiple startfiles.
 	 */
 	if (mask == 4) {
-	    if (nonoption != 0) {
+	    if (nonoption != NULL) {
 		LYEnsureAbsoluteURL(&nonoption, "NONOPTION", FALSE);
 		HTAddGotoURL(nonoption);
 		FREE(nonoption);
@@ -4349,7 +4348,7 @@ static BOOL parse_arg(char **argv,
 	}
 #endif
 	CTRACE((tfp, "parse_arg startfile:%s\n", startfile));
-	return (BOOL) (countp != 0);
+	return (BOOL) (countp != NULL);
     }
 #if EXTENDED_OPTION_LOGIC
     if (strcmp(arg_name, "--") == 0) {
@@ -4376,7 +4375,7 @@ static BOOL parse_arg(char **argv,
     CTRACE((tfp, "parse_arg lookup(%s)\n", arg_name));
 
     p = Arg_Table;
-    while (p->name != 0) {
+    while (p->name != NULL) {
 	ParseUnionPtr q = ParseUnionOf(p);
 	ParseFunc fun;
 	char *next_arg = NULL;
@@ -4389,9 +4388,9 @@ static BOOL parse_arg(char **argv,
 	}
 
 	if (p->type & NEED_NEXT_ARG) {
-	    if (next_arg == 0) {
+	    if (next_arg == NULL) {
 		next_arg = argv[1];
-		if ((countp != 0) && (next_arg != 0))
+		if ((countp != NULL) && (next_arg != NULL))
 		    (*countp)++;
 	    }
 	    CTRACE((tfp, "...arg:%s\n", NONNULL(next_arg)));
@@ -4407,8 +4406,8 @@ static BOOL parse_arg(char **argv,
 	case TOGGLE_ARG:	/* FALLTHRU */
 	case SET_ARG:		/* FALLTHRU */
 	case UNSET_ARG:
-	    if (q->set_value != 0) {
-		if (next_arg == 0) {
+	    if (q->set_value != NULL) {
+		if (next_arg == NULL) {
 		    switch (p->type & ARG_TYPE_MASK) {
 		    case TOGGLE_ARG:
 			*(q->set_value) = (BOOL) !(*(q->set_value));
@@ -4431,24 +4430,24 @@ static BOOL parse_arg(char **argv,
 
 	case FUNCTION_ARG:
 	    fun = q->fun_value;
-	    if (0 != fun) {
+	    if (NULL != fun) {
 		if (-1 == (*fun) (next_arg)) {
 		}
 	    }
 	    break;
 
 	case LYSTRING_ARG:
-	    if ((q->str_value != 0) && (next_arg != 0))
+	    if ((q->str_value != NULL) && (next_arg != NULL))
 		StrAllocCopy(*(q->str_value), next_arg);
 	    break;
 
 	case INT_ARG:
-	    if ((q->int_value != 0) && (next_arg != 0))
+	    if ((q->int_value != NULL) && (next_arg != NULL))
 		*(q->int_value) = (int) strtol(next_arg, &temp_ptr, 0);
 	    break;
 
 	case TIME_ARG:
-	    if ((q->int_value != 0) && (next_arg != 0)) {
+	    if ((q->int_value != NULL) && (next_arg != NULL)) {
 		float ival;
 
 		if (1 == LYscanFloat(next_arg, &ival)) {
@@ -4458,7 +4457,7 @@ static BOOL parse_arg(char **argv,
 	    break;
 
 	case STRING_ARG:
-	    if ((q->str_value != 0) && (next_arg != 0))
+	    if ((q->str_value != NULL) && (next_arg != NULL))
 		*(q->str_value) = next_arg;
 	    break;
 	}
@@ -4467,10 +4466,10 @@ static BOOL parse_arg(char **argv,
 	return TRUE;
     }
 
-    if (pgm == 0)
+    if (pgm == NULL)
 	pgm = "LYNX";
 
-    fprintf(stderr, gettext("%s: Invalid Option: %s\n"), pgm, argv[0]);
+    fprintf(stderr, LY_MSG("%s: Invalid Option: %s\n"), pgm, argv[0]);
     print_help_and_exit(-1);
     return FALSE;
 }

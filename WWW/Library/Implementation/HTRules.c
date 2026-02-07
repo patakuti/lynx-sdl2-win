@@ -1,5 +1,5 @@
 /*
- * $LynxId: HTRules.c,v 1.47 2017/07/02 19:45:22 tom Exp $
+ * $LynxId: HTRules.c,v 1.49 2025/01/07 15:44:34 tom Exp $
  *
  *	Configuration manager for Hypertext Daemon		HTRules.c
  *	==========================================
@@ -62,10 +62,10 @@ char *HTSearchScript = NULL;	/* Search script name.          */
  *	---------------------
  */
 
-static rule *rules = 0;		/* Pointer to first on list */
+static rule *rules = NULL;	/* Pointer to first on list */
 
 #ifndef PUT_ON_HEAD
-static rule *rule_tail = 0;	/* Pointer to last on list */
+static rule *rule_tail = NULL;	/* Pointer to last on list */
 #endif
 
 /*	Add rule to the list					HTAddRule()
@@ -97,7 +97,7 @@ int HTAddRule(HTRuleOp op, const char *pattern,
 	StrAllocCopy(pEquiv, equiv);
 	temp->equiv = pEquiv;
     } else {
-	temp->equiv = 0;
+	temp->equiv = NULL;
     }
     if (cond_op) {
 	StrAllocCopy(temp->condition_op, cond_op);
@@ -127,7 +127,7 @@ int HTAddRule(HTRuleOp op, const char *pattern,
     temp->next = rules;
     rules = temp;
 #else
-    temp->next = 0;
+    temp->next = NULL;
     if (rule_tail)
 	rule_tail->next = temp;
     else
@@ -160,7 +160,7 @@ void HTClearRules(void)
 	FREE(temp);
     }
 #ifndef PUT_ON_HEAD
-    rule_tail = 0;
+    rule_tail = NULL;
 #endif
 }
 
@@ -293,12 +293,14 @@ char *HTTranslate(const char *required)
 	    LYFixCursesOn("show rule message:");	/* and fall through */
 	    /* FALLTHRU */
 	case HT_AlwaysAlert:
-	    pMsg = r->equiv ? r->equiv :
-		(r->op == HT_AlwaysAlert) ? "%s" : "Rule: %s";
-	    if (StrChr(pMsg, '%')) {
-		HTSprintf0(&msgtmp, pMsg, current);
-		pMsg = msgtmp;
-	    }
+	    HTSprintf0(&msgtmp,
+		       HT_FMT("%s", (r->equiv
+				     ? r->equiv
+				     : (r->op == HT_AlwaysAlert)
+				     ? "%s"
+				     : "Rule: %s")),
+		       current);
+	    pMsg = msgtmp;
 	    switch (r->op) {	/* Actually produce message */
 	    case HT_InfoMsg:
 		HTInfoMsg(pMsg);

@@ -1,11 +1,11 @@
 /*
- * $LynxId: HText.h,v 1.17 2020/01/21 22:08:07 tom Exp $
+ * $LynxId: HText.h,v 1.19 2025/06/19 19:51:32 Eric.Lindblad Exp $
  *                                                           Rich Hypertext object for libWWW
  *                                RICH HYPERTEXT OBJECT
  *
  * This is the C interface to the Objective-C (or whatever) Style-oriented
  * HyperText class.  It is used when a style-oriented text object is available
- * or craeted in order to display hypertext.
+ * or created in order to display hypertext.
  */
 #ifndef HTEXT_H
 #define HTEXT_H
@@ -120,7 +120,7 @@ Object Building methods
 /*
 
    The anchor object is created and passed to HText_beginAnchor.  The sensitive
-   text is added to the text object, and then HText_endAnchor is called. 
+   text is added to the text object, and then HText_endAnchor is called.
    Anchors may not be nested.
 
  */

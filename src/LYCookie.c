@@ -1,5 +1,5 @@
 /*
- * $LynxId: LYCookie.c,v 1.147 2019/01/26 00:50:13 tom Exp $
+ * $LynxId: LYCookie.c,v 1.149 2025/07/24 21:00:14 tom Exp $
  *
  *			       Lynx Cookie Support		   LYCookie.c
  *			       ===================
@@ -383,7 +383,7 @@ static domain_entry *find_domain_entry(const char *name)
     domain_entry *de = NULL;
     const char *find;
 
-    if (name != 0
+    if (name != NULL
 	&& *(find = SkipLeadingDot(name)) != '\0') {
 	for (hl = domain_list; hl != NULL; hl = hl->next) {
 	    de = (domain_entry *) hl->object;
@@ -625,7 +625,7 @@ static void store_cookie(cookie * co, const char *hostname,
      * kw
      */
     if (invprompt_reasons) {
-	char *msg = 0;
+	char *msg = NULL;
 
 	if (invprompt_reasons & FAILS_COND4) {
 	    HTSprintf0(&msg,
@@ -858,8 +858,8 @@ static char *scan_cookie_sublist(char *hostname,
 	/*
 	 * Check if we have a unexpired match, and handle if we do.
 	 */
-	if (co->domain != 0 &&
-	    co->name != 0 &&
+	if (co->domain != NULL &&
+	    co->name != NULL &&
 	    domain_matches(hostname, co->ddomain) &&
 	    (co->pathlen == 0 || is_prefix(co->path, path))) {
 	    /*
@@ -2052,7 +2052,7 @@ void LYLoadCookies(char *cookie_file)
     CTrace((tfp, "LYLoadCookies: reading cookies from %s\n", cookie_file));
 
     number_of_file_cookies = 0;
-    while (LYSafeGets(&buf, cookie_handle) != 0) {
+    while (LYSafeGets(&buf, cookie_handle) != NULL) {
 	cookie *moo;
 	int tok_loop;
 	char *tok_out, *tok_ptr;
@@ -2580,7 +2580,7 @@ static int LYHandleCookies(const char *arg,
     HTSprintf0(&buf, "%s</div>\n", OR_CHANGE_ALLOW);
     PUTS(buf);
 
-    HTSprintf0(&buf, "<dl compact>\n");
+    StrAllocCopy(buf, "<dl compact>\n");
     PUTS(buf);
     for (dl = domain_list; dl != NULL; dl = dl->next) {
 	de = (domain_entry *) (dl->object);
@@ -2599,17 +2599,17 @@ static int LYHandleCookies(const char *arg,
 	PUTS(buf);
 	switch (de->bv) {
 	case (ACCEPT_ALWAYS):
-	    HTSprintf0(&buf, COOKIES_ALWAYS_ALLOWED);
+	    StrAllocCopy(buf, COOKIES_ALWAYS_ALLOWED);
 	    break;
 	case (REJECT_ALWAYS):
-	    HTSprintf0(&buf, COOKIES_NEVER_ALLOWED);
+	    StrAllocCopy(buf, COOKIES_NEVER_ALLOWED);
 	    break;
 	case (QUERY_USER):
-	    HTSprintf0(&buf, COOKIES_ALLOWED_VIA_PROMPT);
+	    StrAllocCopy(buf, COOKIES_ALLOWED_VIA_PROMPT);
 	    break;
 	}
 	PUTS(buf);
-	HTSprintf0(&buf, "\n");
+	StrAllocCopy(buf, "\n");
 	PUTS(buf);
 
 	/*
@@ -2718,10 +2718,10 @@ static int LYHandleCookies(const char *arg,
 			"" : "\n"));
 	    PUTS(buf);
 	}
-	HTSprintf0(&buf, "\n");
+	StrAllocCopy(buf, "\n");
 	PUTS(buf);
     }
-    HTSprintf0(&buf, "</dl>\n</body>\n</html>\n");
+    StrAllocCopy(buf, "</dl>\n</body>\n</html>\n");
     PUTS(buf);
 
     /*
@@ -2768,7 +2768,7 @@ static void cookie_domain_flag_set(char *domainstr,
 
     *str = dstr;
 
-    while ((strsmall = LYstrsep(str, ",")) != 0) {
+    while ((strsmall = LYstrsep(str, ",")) != NULL) {
 
 	if (*strsmall == '\0')
 	    /* Never add a domain for empty string.  It would actually
@@ -2894,5 +2894,5 @@ void LYConfigCookies(void)
 GLOBALDEF(HTProtocol, LYLynxCookies, _LYCOOKIE_C_GLOBALDEF_1_INIT);
 #else
 GLOBALDEF HTProtocol LYLynxCookies =
-{"LYNXCOOKIE", LYHandleCookies, 0};
+{"LYNXCOOKIE", LYHandleCookies, NULL};
 #endif /* GLOBALDEF_IS_MACRO */

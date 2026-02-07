@@ -1,8 +1,8 @@
 /*
- * $LynxId: HTString.h,v 1.41 2021/06/09 19:30:55 tom Exp $
+ * $LynxId: HTString.h,v 1.45 2025/01/08 00:30:50 tom Exp $
  *						String handling for libwww
  *                                         STRINGS
- *                                            
+ *
  * Case-independent string comparison and allocations with copies etc
  */
 #ifndef HTSTRING_H
@@ -93,6 +93,28 @@ extern "C" {
     extern char *HTSprintf(char **pstr, const char *fmt, ...) GCC_PRINTFLIKE(2,3);
     extern char *HTSprintf0(char **pstr, const char *fmt, ...) GCC_PRINTFLIKE(2,3);
 
+    /*
+     * Provide a way to check at runtime (LY_TEST_FMTS==1) or compile-time
+     * (LY_TEST_FMTS==2) for the translated messages.
+     */
+#ifndef LY_TEST_FMTS
+#define LY_TEST_FMTS 0
+#endif
+
+#if LY_TEST_FMTS > 1
+#define HT_FMT(expected,actual)	expected
+#elif LY_TEST_FMTS > 0
+    extern const char *LYtextFmts(const char *s_expect, const char *s_actual);
+#define HT_FMT(expected,actual) LYtextFmts(expected,actual)
+#else
+#define HT_FMT(expected,actual)	actual
+#endif
+
+/*
+ * Use this macro for translatable-strings which are used as printf-formats.
+ */
+#define LY_MSG(msg) HT_FMT(msg,gettext(msg))
+
 #if defined(LY_FIND_LEAKS)	/* private otherwise */
     extern char *StrAllocVsprintf(char **pstr,
 				  size_t len,
@@ -141,12 +163,12 @@ extern "C" {
     extern BOOL HTSABEql(bstring *a, bstring *b);
     extern void HTSABFree(bstring **ptr);
 
-#define BStrLen(s)    (((s) != 0) ? (s)->len : 0)
-#define BStrData(s)   (((s) != 0) ? (s)->str : 0)
+#define BStrLen(s)    (((s) != NULL) ? (s)->len : 0)
+#define BStrData(s)   (((s) != NULL) ? (s)->str : NULL)
 
 #define BINEQ(a,b)    (HTSABEql(a,b))	/* like STREQ() */
 
-#define isBEmpty(p)   ((p) == 0 || BStrData(p) == 0 || BStrLen(p) == 0)
+#define isBEmpty(p)   ((p) == NULL || BStrData(p) == NULL || BStrLen(p) == 0)
 
 #define BStrAlloc(d,n)   HTSABAlloc( &(d), n)
 #define BStrCopy(d,s)    HTSABCopy( &(d), BStrData(s), BStrLen(s))

@@ -1,4 +1,4 @@
-# $LynxId: makefile.in,v 1.200 2024/05/31 23:03:20 tom Exp $
+# $LynxId: makefile.in,v 1.203 2025/08/05 20:32:53 tom Exp $
 ##makefile for lynx
 
 SHELL		= @CONFIG_SHELL@
@@ -109,7 +109,7 @@ COMPRESS_EXT=@COMPRESS_EXT@
 # Path of scripts directory
 scripts_dir=$(srcdir)/scripts
 
-MAKE_RECUR = $(MAKE) @cf_cv_makeflags@ DESTDIR="$(DESTDIR)" CC="$(CC)"
+MAKE_RECUR = $(MAKE) DESTDIR="$(DESTDIR)" CC="$(CC)"
 
 @LYNXCFG_MAKE@CFG2HTML = alphatoc.html body.html cattoc.html
 
@@ -231,7 +231,7 @@ help:
 	@echo
 
 ##Miscellaneous actions
-clean:
+clean::
 	rm -f WWW/Library/*/*.[aoib]
 	rm -f WWW/Library/*/.created
 	( cd $(WWW_DIR) && $(MAKE_RECUR) $@ )
@@ -256,7 +256,7 @@ distclean: clean
 	-( cd $(CHR_DIR) && $(MAKE_RECUR) $@ )
 @MSG_DIR_MAKE@	-( cd $(PO_DIR) && $(MAKE_RECUR) $@ )
 @MSG_DIR_MAKE@	-rmdir $(PO_DIR)
-	-rm -f *~ *.bak *.sav tags TAGS
+	-rm -f *~ *.bak *.sav *.tmp tags TAGS
 	-rm -f $(WWW_DIR)/makefile $(SRC_DIR)/makefile $(CHR_DIR)/makefile
 @SRCDIR_CLEAN@	-rmdir $(WWW_DIR) && rmdir WWW/Library && rmdir WWW
 @SRCDIR_CLEAN@	-rmdir $(CHR_DIR) && rmdir $(SRC_DIR)

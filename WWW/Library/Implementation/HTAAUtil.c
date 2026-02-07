@@ -1,5 +1,5 @@
 /*
- * $LynxId: HTAAUtil.c,v 1.36 2016/11/24 15:29:50 tom Exp $
+ * $LynxId: HTAAUtil.c,v 1.39 2025/07/22 00:36:14 tom Exp $
  *
  * MODULE							HTAAUtil.c
  *		COMMON PARTS OF ACCESS AUTHORIZATION MODULE
@@ -46,12 +46,11 @@
  *
  */
 
-#include <HTUtils.h>
+#include <HTTLS.h>
 
 #include <HTAAUtil.h>		/* Implemented here     */
 #include <HTAssoc.h>		/* Assoc list           */
 #include <HTTCP.h>
-#include <HTTP.h>
 
 #include <LYStrings.h>
 #include <LYUtils.h>
@@ -438,7 +437,7 @@ HTAssocList *HTAA_parseArgList(char *str)
 #define BUFFER_SIZE	1024
 
 static size_t buffer_length;
-static char *buffer = 0;
+static char *buffer = NULL;
 static char *start_pointer;
 static char *end_pointer;
 static int in_soc = -1;

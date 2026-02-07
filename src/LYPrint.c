@@ -1,5 +1,5 @@
 /*
- * $LynxId: LYPrint.c,v 1.109 2021/07/29 20:38:35 tom Exp $
+ * $LynxId: LYPrint.c,v 1.113 2025/07/24 21:06:02 tom Exp $
  */
 #include <HTUtils.h>
 #include <HTAccess.h>
@@ -84,7 +84,7 @@ static void set_environ(int name,
 	"LYNX_PRINT_LASTMOD",
     };
     static char *pointers[MAX_PUTENV];
-    char *envbuffer = 0;
+    char *envbuffer = NULL;
 
 #ifdef VMS
 #define SET_ENVIRON(name, value, no_value) set_environ(name, value, no_value)
@@ -112,13 +112,13 @@ static void set_environ(int name,
 
 static char *suggested_filename(DocInfo *newdoc)
 {
-    char *sug_filename = 0;
+    char *sug_filename = NULL;
     int rootlen;
 
     /*
      * Load the suggested filename string.  - FM
      */
-    if (HText_getSugFname() != 0)
+    if (HText_getSugFname() != NULL)
 	StrAllocCopy(sug_filename, HText_getSugFname());	/* must be freed */
     else
 	StrAllocCopy(sug_filename, newdoc->address);	/* must be freed */
@@ -281,9 +281,11 @@ static BOOLEAN confirm_by_pages(const char *prompt,
 	pages++;
 
     if (pages > 4) {
-	char *msg = 0;
+	char *msg = NULL;
 
-	HTSprintf0(&msg, prompt, pages);
+	HTSprintf0(&msg, HT_FMT("%d", prompt), pages);
+	(void) prompt;
+
 	c = HTConfirmDefault(msg, YES);
 	FREE(msg);
 
@@ -583,9 +585,9 @@ static void send_file_to_mail(DocInfo *newdoc,
 	    CannotPrint(UNABLE_TO_OPEN_TEMPFILE);
 	}
 	if (use_type) {
-	    fprintf(hfd, "Mime-Version: 1.0\n");
+	    fputs("Mime-Version: 1.0\n", hfd);
 	    if (use_cte) {
-		fprintf(hfd, "Content-Transfer-Encoding: 8bit\n");
+		fputs("Content-Transfer-Encoding: 8bit\n", hfd);
 	    }
 	}
 	if (HTisDocumentSource()) {
@@ -593,11 +595,11 @@ static void send_file_to_mail(DocInfo *newdoc,
 	     * Add Content-Type, Content-Location, and Content-Base headers for
 	     * HTML source.  - FM
 	     */
-	    fprintf(hfd, "Content-Type: " STR_HTML);
+	    fputs("Content-Type: " STR_HTML, hfd);
 	    if (disp_charset != NULL) {
 		fprintf(hfd, "; charset=%s\n", disp_charset);
 	    } else {
-		fprintf(hfd, "\n");
+		fputs("\n", hfd);
 	    }
 	    fprintf(hfd, "Content-Base: %s\n", content_base);
 	    fprintf(hfd, "Content-Location: %s\n", content_location);
@@ -672,7 +674,7 @@ static void send_file_to_mail(DocInfo *newdoc,
 
     stop_curses();
     SetOutputMode(O_TEXT);
-    printf(MAILING_FILE);
+    fputs(MAILING_FILE, stdout);
     LYSystem(buffer);
     LYSleepAlert();
     start_curses();
@@ -723,9 +725,9 @@ static void send_file_to_mail(DocInfo *newdoc,
     use_mime = (BOOL) (use_cte || use_type);
 
     if (use_mime) {
-	fprintf(outfile_fp, "Mime-Version: 1.0\n");
+	fputs("Mime-Version: 1.0\n", outfile_fp);
 	if (use_cte) {
-	    fprintf(outfile_fp, "Content-Transfer-Encoding: 8bit\n");
+	    fputs("Content-Transfer-Encoding: 8bit\n", outfile_fp);
 	}
     }
 
@@ -738,7 +740,7 @@ static void send_file_to_mail(DocInfo *newdoc,
 	if (disp_charset != NULL) {
 	    fprintf(outfile_fp, "; charset=%s\n", disp_charset);
 	} else {
-	    fprintf(outfile_fp, "\n");
+	    fputs("\n", outfile_fp);
 	}
     } else {
 	/*
@@ -811,7 +813,7 @@ static void send_file_to_printer(DocInfo *newdoc,
 {
     BOOLEAN FirstRecall = TRUE;
     FILE *outfile_fp;
-    char *the_command = 0;
+    char *the_command = NULL;
     bstring *my_file = NULL;
     char my_temp[LY_MAXPATH];
     int FnameTotal, FnameNum = -1;
@@ -923,7 +925,7 @@ static void send_file_to_printer(DocInfo *newdoc,
     stop_curses();
     CTRACE((tfp, "command: %s\n", the_command));
     SetOutputMode(O_TEXT);
-    printf(PRINTING_FILE);
+    fputs(PRINTING_FILE, stdout);
     /*
      * Set various bits of document information as environment variables, for
      * use by external print scripts/etc.  On UNIX, We assume there are values,
@@ -953,7 +955,7 @@ static void send_file_to_printer(DocInfo *newdoc,
     signal(SIGINT, cleanup_sig);
 #endif /* !VMS */
 #ifdef SH_EX
-    fprintf(stdout, gettext(" Print job complete.\n"));
+    fputs(LY_MSG(" Print job complete.\n"), stdout);
     fflush(stdout);
 #endif
     SetOutputMode(O_BINARY);
@@ -1003,7 +1005,7 @@ static void send_file_to_screen(DocInfo *newdoc,
 		    newdoc->address, content_base);
 	}
 	if (Lpansi)
-	    printf("\033[5i");
+	    fputs("\033[5i", stdout);
 	print_wwwfile_to_fd(outfile_fp, FALSE, FALSE);	/* SCREEN */
 	if (keypad_mode)
 	    printlist(outfile_fp, FALSE);
@@ -1016,8 +1018,8 @@ static void send_file_to_screen(DocInfo *newdoc,
 	}
 #endif /* VMS */
 	if (Lpansi) {
-	    printf("\n\014");	/* Form feed */
-	    printf("\033[4i");
+	    fputs("\n\014", stdout);	/* Form feed */
+	    fputs("\033[4i", stdout);
 	    fflush(stdout);	/* refresh to screen */
 	} else {
 	    fprintf(stdout, "\n\n%s", PRESS_RETURN_TO_FINISH);
@@ -1028,7 +1030,7 @@ static void send_file_to_screen(DocInfo *newdoc,
 #endif /* VMS */
 	}
 #ifdef SH_EX
-	fprintf(stdout, "\n");
+	fputs("\n", stdout);
 #endif
 	SetOutputMode(O_BINARY);
 	start_curses();
@@ -1261,20 +1263,20 @@ int print_options(char **newfile,
 		  int lines_in_file)
 {
     static char my_temp[LY_MAXPATH] = "\0";
-    char *buffer = 0;
+    char *buffer = NULL;
     int count;
     int pages;
     FILE *fp0;
     lynx_list_item_type *cur_printer;
 
-    if ((fp0 = InternalPageFP(my_temp, TRUE)) == 0)
+    if ((fp0 = InternalPageFP(my_temp, TRUE)) == NULL)
 	return (-1);
 
     LYLocalFileToURL(newfile, my_temp);
 
     BeginInternalPage(fp0, PRINT_OPTIONS_TITLE, PRINT_OPTIONS_HELP);
 
-    fprintf(fp0, "<pre>\n");
+    fputs("<pre>\n", fp0);
 
     /*  pages = lines_in_file/66 + 1; */
     pages = (lines_in_file + 65) / 66;
@@ -1341,7 +1343,7 @@ int print_options(char **newfile,
 				cur_printer->name : "No Name Given"));
 	    fprintf(fp0, "</a>\n");
 	}
-    fprintf(fp0, "</pre>\n");
+    fputs("</pre>\n", fp0);
     EndInternalPage(fp0);
     LYCloseTempFP(fp0);
 

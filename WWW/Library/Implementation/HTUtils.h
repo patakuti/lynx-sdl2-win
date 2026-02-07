@@ -1,9 +1,9 @@
 /*
- * $LynxId: HTUtils.h,v 1.137 2024/03/17 23:04:27 tom Exp $
+ * $LynxId: HTUtils.h,v 1.141 2025/07/22 00:18:23 tom Exp $
  *
  * Utility macros for the W3 code library
  * MACROS FOR GENERAL USE
- * 
+ *
  * See also:  the system dependent file "www_tcp.h", which is included here.
  */
 
@@ -364,11 +364,13 @@ Standard C library for malloc() etc
 
 #define DeConst(p)   (void *)(intptr_t)(p)
 
-#define isEmpty(s)   ((s) == 0 || *(s) == 0)
+#define isEmpty(s)   ((s) == NULL || *(s) == 0)
+#define isEmptyS(s)  ((s) == NULL || *(s) == NULL)
 #define non_empty(s) !isEmpty(s)
+#define non_emptyS(s) !isEmptyS(s)
 
-#define NonNull(s) (((s) != 0) ? s : "")
-#define NONNULL(s) (((s) != 0) ? s : "(null)")
+#define NonNull(s) (((s) != NULL) ? s : "")
+#define NONNULL(s) (((s) != NULL) ? s : "(null)")
 
 /* array/table size */
 #define	TABLESIZE(v)	(sizeof(v)/sizeof(v[0]))
@@ -541,7 +543,7 @@ Out Of Memory checking for malloc() return:
 
 #endif /* TOLOWER */
 
-#define FREE(x)    {if (x != 0) {free((char *)x); x = NULL;}}
+#define FREE(x)    {if (x != NULL) {free((char *)x); x = NULL;}}
 
 /*
 
@@ -702,7 +704,7 @@ extern int WWW_TraceMask;
 #define CTRACE(p)         ((void)((TRACE) && ( LY_SHOWWHERE fprintf p )))
 #define CTRACE2(m,p)      ((void)((m)     && ( LY_SHOWWHERE fprintf p )))
 #define tfp TraceFP()
-#define CTRACE_SLEEP(secs) if (TRACE && LYTraceLogFP == 0) sleep((unsigned)secs)
+#define CTRACE_SLEEP(secs) if (TRACE && LYTraceLogFP == NULL) sleep((unsigned)secs)
 #define CTRACE_FLUSH(fp)   if (TRACE) fflush(fp)
 
 #include <www_tcp.h>
@@ -755,47 +757,6 @@ extern int WWW_TraceMask;
 #include <socks.h>
 #endif /* USE_SOCKS5 */
 
-#ifdef USE_SSL
-
-#define free_func free__func
-
-#ifdef USE_OPENSSL_INCL
-#include <openssl/ssl.h>
-#include <openssl/crypto.h>
-#include <openssl/rand.h>
-#include <openssl/err.h>
-
-#else
-
-#if defined(USE_GNUTLS_FUNCS)
-#include <tidy_tls.h>
-#define USE_GNUTLS_INCL 1	/* do this for the ".c" ifdef's */
-#elif defined(USE_GNUTLS_INCL)
-#include <gnutls/openssl.h>
-/*
- * GNUTLS's implementation of OpenSSL is very incomplete and rudimentary.
- * For a start, let's make it compile (TD - 2003/4/13).
- */
-#ifndef SSL_VERIFY_PEER
-#define SSL_VERIFY_PEER			0x01
-#endif
-#else
-
-#ifdef USE_NSS_COMPAT_INCL
-#include <nss_compat_ossl/nss_compat_ossl.h>
-
-#else /* assume SSLeay */
-#include <ssl.h>
-#include <crypto.h>
-#include <rand.h>
-#include <err.h>
-#endif
-#endif
-#endif /* USE_OPENSSL_INCL */
-
-#undef free_func
-#endif /* USE_SSL */
-
 #ifdef HAVE_BSD_STDLIB_H
 #include <bsd/stdlib.h>		/* prototype for arc4random.h */
 #elif defined(HAVE_BSD_RANDOM_H)
@@ -833,12 +794,6 @@ extern "C" {
 
     extern char *HTSkipToAt(char *host, int *gen_delims);
     extern void strip_userid(char *host, int warn);
-
-#ifdef USE_SSL
-    extern SSL *HTGetSSLHandle(void);
-    extern void HTSSLInitPRNG(void);
-    extern int HTGetSSLCharacter(void *handle);
-#endif				/* USE_SSL */
 
 #ifdef __cplusplus
 }

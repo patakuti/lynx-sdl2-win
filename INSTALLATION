@@ -134,10 +134,10 @@ II. Compile instructions -- UNIX
     library available to link to.  Native curses (on the system when it was
     installed) are often broken, so you may get superior performance if you
     have either
-    
+
 	    "ncurses" ("https://invisible-island.net/ncurses") or
 	    "slang"   ("https://www.jedsoft.org/slang/").
-    
+
     If you install these libraries in your home directory or a non-default
     location, you may need to set the CPPFLAGS (full path to include files) and
     LIBS (full path to library files) environment variables BEFORE running
@@ -297,10 +297,10 @@ II. Compile instructions -- UNIX
 	various utilities invoked by lynx as external commands.  By default,
 	full pathnames are compiled in for the the locations where configure
 	finds these commands at configure time.
-	
+
 	Affected commands include
 		chmod compress cp gzip install mkdir mv rm tar touch gunzip
-		unzip brotli bzip2 uudecode zcat zip telnet tn3270 rlogin
+		unzip brotli bzip2 uudecode zcat zip zstd telnet tn3270 rlogin
 	(Not all commands are used on all systems or in all configurations.)
 
 	This option makes Lynx simpler to install, but potentially less secure,
@@ -327,15 +327,17 @@ II. Compile instructions -- UNIX
 
   --disable-japanese-utf8		(define USE_JAPANESEUTF8_SUPPORT)
 	use Japanese UTF-8 logic, which uses iconv to convert pages with
-	charset euc-jp, shift_jis to utf-8. 
+	charset euc-jp, shift_jis to utf-8.
 
   --disable-justify-elts		(define USE_JUSTIFY_ELTS)
 	Do not use element-justification logic.
 
   --disable-largefile			(prevent defining LONG_LIST)
-
 	Use this option to disable the compiler and linker options that
 	provide largefile interfaces.
+
+  --disable-link-prefix
+	Use this option to not trim unneeded libraries from link command
 
   --disable-locale-charset		(define USE_LOCALE_CHARSET)
   	Use nl_langinfo(CODESET) to determine initial value for display
@@ -411,6 +413,12 @@ II. Compile instructions -- UNIX
 	information to diagnose problems with either Lynx or the sites to which
 	you connect.
 
+  --disable-wcwidth-support		(define USE_WCWIDTH_SUPPORT
+	use wcwidth/UTF-8 logic, e.g., with wide-character ncurses
+
+  --enable-arc4random			(define USE_ASCII_CTYPES)
+	Enable/disable configure script check for arc4random.
+
   --enable-ascii-ctypes			(define USE_ASCII_CTYPES)
 	Compiles-in alternative case-conversion functions which ensure that
 	configuration names, etc., are compared in POSIX locale.  This is
@@ -467,10 +475,6 @@ II. Compile instructions -- UNIX
 	fonts) according to the current Display Character Set.  (Linux console
 	only.  *Use with discretion.*  See docs/README.chartrans.)
 
-  --enable-gnutls-compat		(define USE_GNUTLS_FUNCS)
-	When --with-gnutls is used, tell whether to use GNUTLS's OpenSSL
-	compatibility library or use GNUTLS's low-level API directly.
-
   --enable-gzip-help
 	Install the lynx help files in gzip'd format [*.gz] to save space.
 
@@ -514,11 +518,11 @@ II. Compile instructions -- UNIX
 
 	This relies upon external programs (msgfmt and xgettext) to format
 	the message catalogs:
-	
+
 	    + Unless you set the environment variables MSGFMT and XGETTEXT to
 	      the full pathnames of these utilities, the configure script will
 	      search for the GNU versions of these utilities.
-	      
+
 	      It will also search for the GNU version of the corresponding
 	      gettext() runtime function.  On some platforms (such as Solaris),
 	      this search gives misleading results.
@@ -551,15 +555,17 @@ II. Compile instructions -- UNIX
   --enable-wais
 	Use this option to turn on configure check for freeWAIS library.
 
-  --enable-wcwidth-support		(define EXP_WCWIDTH_SUPPORT)
-	use experimental wcwidth/UTF-8 logic.
-
   --enable-widec
 	Use this option to allow the configure script to look for wide-curses
 	features.  If you do not specify the option, the configure script
 	will look for these features if --with-screen=ncursesw is given.
-	For this release of Lynx, we recommend the ncursew library built from
-	ncurses 5.5.
+
+	For this release of Lynx, we recommend the ncursesw library (i.e.,
+	the "wide-character" configuration of ncurses).  In this case,
+	Lynx's default for the configuration setting LOCALE_CHARSET is "ON".
+
+	Other curses libraries provide limited support for Unicode.
+	The slang configuration does not provide usable support for Unicode.
 
   --sysconfdir				(affect LYNX_CFG_FILE)
 	Defines the location where you want the lynx.cfg file installed.
@@ -663,8 +669,6 @@ II. Compile instructions -- UNIX
 	are assumed to be in the parallel "include" directory.  The default
 	is /usr/local/gnutls.
 
-	See the "--enable-gnutls-compat" option.
-
   --with-libiconv-prefix=DIR
 	search for libiconv in DIR/include and DIR/lib
 
@@ -675,6 +679,11 @@ II. Compile instructions -- UNIX
 	Specify the default style-sheet file's name.  Use --without-lss-file
 	to make the default behavior match the non-color-style (if no --lss
 	option is given, and no COLOR_STYLE setting is in lynx.cfg).
+
+  --with-man2html[=XXX]
+	Optionally use man2html (or some other program XXX)
+		https://invisible-island.net/scripts/man2html.html
+	when generating lynx.html from lynx.man
 
   --with-mime-libdir=list		(define MIME_LIBDIR)
 	Use this option to specify the system directory containing the
@@ -689,16 +698,6 @@ II. Compile instructions -- UNIX
 	under which the locale (i.e., language) files are installed.  The
 	default value is derived at configure time, and depends on whether GNU
 	or native gettext is used.
-
-  --with-nss-compat[=XXX]		(define USE_NSS_COMPAT_INCL)
-	Use this option to configure with the NSS library's OpenSSL-compatible
-	interface.
-	See docs/README.ssl for additional information.
-
-	The optional value XXX specifies the directory in which the library
-	can be found, and may be either the path of the "lib" directory,
-	or one level above.  In either case, the corresponding header files
-	are assumed to be in the parallel "include" directory.
 
   --with-pkg-config[=XXX]
 	Use pkg-config, if available, to tell how to build with certain
@@ -781,6 +780,14 @@ II. Compile instructions -- UNIX
 
   --with-zlib[=XXX]			(define USE_ZLIB)
 	Use zlib for decompression of some gzip files.
+
+	The optional value XXX specifies the directory in which the library
+	can be found, and may be either the path of the "lib" directory,
+	or one level above.  In either case, the corresponding header files
+	are assumed to be in the parallel "include" directory.
+
+  --with-zstd[=XXX]			(define USE_ZSTD)
+	Use zstd decompression.
 
 	The optional value XXX specifies the directory in which the library
 	can be found, and may be either the path of the "lib" directory,
@@ -1503,4 +1510,4 @@ VIII. Acknowledgment
 
 -- 1999/04/24 - H. Nelson <lynx-admin@irm.nara.kindai.ac.jp>
 -- vile:txtmode
--- $LynxId: INSTALLATION,v 1.140 2024/05/29 22:41:52 tom Exp $
+-- $LynxId: INSTALLATION,v 1.149 2025/08/05 20:31:12 tom Exp $

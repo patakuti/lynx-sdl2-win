@@ -1,5 +1,5 @@
 /*
- * $LynxId: HTNews.c,v 1.81 2022/04/01 00:18:22 tom Exp $
+ * $LynxId: HTNews.c,v 1.85 2025/07/22 00:34:58 tom Exp $
  *
  *			NEWS ACCESS				HTNews.c
  *			===========
@@ -9,18 +9,13 @@
  *	29 Nov 91	Downgraded to C, for portable implementation.
  */
 
-#include <HTUtils.h>		/* Coding convention macros */
+#include <HTNews.h>		/* Coding convention macros */
 
 #ifndef DISABLE_NEWS
 
 /* Implements:
 */
-#include <HTNews.h>
-
-#include <HTCJK.h>
 #include <HTMIME.h>
-#include <HTFont.h>
-#include <HTFormat.h>
 #include <HTTCP.h>
 #include <LYUtils.h>
 #include <LYStrings.h>
@@ -123,10 +118,10 @@ static char *dbuf = NULL;	/* dynamic buffer for long messages etc. */
 #define PUTC(c) (*targetClass.put_character)(target, c)
 #define PUTS(s) (*targetClass.put_string)(target, s)
 #define RAW_PUTS(s) (*rawtargetClass.put_string)(rawtarget, s)
-#define START(e) (*targetClass.start_element)(target, e, 0, 0, -1, 0)
-#define END(e) (*targetClass.end_element)(target, e, 0)
+#define START(e) (*targetClass.start_element)(target, e, NULL, NULL, -1, NULL)
+#define END(e) (*targetClass.end_element)(target, e, NULL)
 #define MAYBE_END(e) if (HTML_dtd.tags[e].contents != SGML_EMPTY) \
-			(*targetClass.end_element)(target, e, 0)
+			(*targetClass.end_element)(target, e, NULL)
 #define FREE_TARGET if (rawtext) (*rawtargetClass._free)(rawtarget); \
 			else (*targetClass._free)(target)
 #define ABORT_TARGET if (rawtext) (*rawtargetClass._abort)(rawtarget, NULL); \
@@ -186,8 +181,8 @@ static void load_NNTP_AuthInfo(void)
 
     LYAddPathToHome(fname, sizeof(fname), NEWS_AUTH_FILE);
 
-    if ((fp = fopen(fname, "r")) != 0) {
-	while (fgets(buffer, (int) sizeof(buffer), fp) != 0) {
+    if ((fp = fopen(fname, "r")) != NULL) {
+	while (fgets(buffer, (int) sizeof(buffer), fp) != NULL) {
 	    char the_host[LINE_LENGTH + 1];
 	    char the_pass[LINE_LENGTH + 1];
 	    char the_user[LINE_LENGTH + 1];
@@ -436,7 +431,7 @@ static NNTPAuthResult HTHandleAuthInfo(char *host)
 
     while (tries) {
 	if (UserName == NULL) {
-	    HTSprintf0(&msg, gettext("Username for news host '%s':"), host);
+	    HTSprintf0(&msg, LY_MSG("Username for news host '%s':"), host);
 	    UserName = HTPrompt(msg, NULL);
 	    FREE(msg);
 	    if (!(UserName && *UserName)) {
@@ -518,7 +513,7 @@ static NNTPAuthResult HTHandleAuthInfo(char *host)
 	tries = 3;
 	while (tries) {
 	    if (PassWord == NULL) {
-		HTSprintf0(&msg, gettext("Password for news host '%s':"), host);
+		HTSprintf0(&msg, LY_MSG("Password for news host '%s':"), host);
 		PassWord = HTPromptPassword(msg, NULL);
 		FREE(msg);
 		if (!(PassWord && *PassWord)) {
@@ -569,7 +564,7 @@ static NNTPAuthResult HTHandleAuthInfo(char *host)
 	    }
 	    if (status == 281) {
 		/*
-		 * Password also is accepted, and everything has been stored. 
+		 * Password also is accepted, and everything has been stored.
 		 * - FM
 		 */
 		if (auth) {
@@ -728,7 +723,7 @@ static void start_anchor(const char *href)
     for (i = 0; i < HTML_A_ATTRIBUTES; i++)
 	present[i] = (BOOL) (i == HTML_A_HREF);
     value[HTML_A_HREF] = href;
-    (*targetClass.start_element) (target, HTML_A, present, value, -1, 0);
+    (*targetClass.start_element) (target, HTML_A, present, value, -1, NULL);
 }
 
 /*	Start link element
@@ -744,7 +739,7 @@ static void start_link(const char *href, const char *rev)
 	present[i] = (BOOL) (i == HTML_LINK_HREF || i == HTML_LINK_REV);
     value[HTML_LINK_HREF] = href;
     value[HTML_LINK_REV] = rev;
-    (*targetClass.start_element) (target, HTML_LINK, present, value, -1, 0);
+    (*targetClass.start_element) (target, HTML_LINK, present, value, -1, NULL);
 }
 
 /*	Start list element
@@ -762,7 +757,7 @@ static void start_list(int seqnum)
     sprintf(SeqNum, "%d", seqnum);
     value[HTML_OL_SEQNUM] = SeqNum;
     value[HTML_OL_START] = SeqNum;
-    (*targetClass.start_element) (target, HTML_OL, present, value, -1, 0);
+    (*targetClass.start_element) (target, HTML_OL, present, value, -1, NULL);
 }
 
 /*	Paste in an Anchor
@@ -1722,7 +1717,7 @@ static int read_list(char *arg)
 	char *msg = NULL;
 
 	START(HTML_DT);
-	HTSprintf0(&msg, gettext("No matches for: %s"), arg);
+	HTSprintf0(&msg, LY_MSG("No matches for: %s"), arg);
 	PUTS(msg);
 	MAYBE_END(HTML_DT);
 	FREE(msg);
@@ -1797,7 +1792,7 @@ static int read_group(const char *groupName,
     /*
      * Set window title.
      */
-    HTSprintf0(&temp, gettext("%s,  Articles %d-%d"),
+    HTSprintf0(&temp, LY_MSG("%s,  Articles %d-%d"),
 	       groupName, first_required, last_required);
     START(HTML_H1);
     PUTS(temp);
@@ -1833,7 +1828,7 @@ static int read_group(const char *groupName,
 #ifdef USE_XHDR
     if (count > FAST_THRESHOLD) {
 	HTSprintf0(&temp,
-		   gettext("\nThere are about %d articles currently available in %s, IDs as follows:\n\n"),
+		   LY_MSG("\nThere are about %d articles currently available in %s, IDs as follows:\n\n"),
 		   count, groupName);
 	PUTS(temp);
 	FREE(temp);
@@ -2165,7 +2160,7 @@ static int HTLoadNews(const char *arg,
     BOOL sreply_wanted;		/* Flag: followup SSL post was asked for */
     BOOL head_wanted = NO;	/* Flag: want HEAD of single article */
     int first, last;		/* First and last articles asked for */
-    char *cp = 0;
+    char *cp = NULL;
     char *ListArg = NULL;
     char *ProxyHost = NULL;
     char *ProxyHREF = NULL;
@@ -2503,8 +2498,8 @@ static int HTLoadNews(const char *arg,
 	    }
 	    SnipIn(command, "GROUP %.*s", 9, groupName);
 	} else {
-	    size_t add_open = (size_t) (StrChr(p1, '<') == 0);
-	    size_t add_close = (size_t) (StrChr(p1, '>') == 0);
+	    size_t add_open = (size_t) (StrChr(p1, '<') == NULL);
+	    size_t add_close = (size_t) (StrChr(p1, '>') == NULL);
 
 	    if (strlen(p1) + add_open + add_close >= 252) {
 		FREE(ProxyHost);
@@ -2644,7 +2639,7 @@ static int HTLoadNews(const char *arg,
 		      spost_wanted || sreply_wanted)) {
 		    ABORT_TARGET;
 		}
-		HTSprintf0(&dbuf, gettext("Could not access %s."), NewsHost);
+		HTSprintf0(&dbuf, LY_MSG("Could not access %s."), NewsHost);
 		FREE(NewsHost);
 		FREE(NewsHREF);
 		FREE(ProxyHost);
@@ -2750,11 +2745,11 @@ static int HTLoadNews(const char *arg,
 		    }
 		    if (response_text[0]) {
 			HTSprintf0(&dbuf,
-				   gettext("Can't read news info.  News host %.20s responded: %.200s"),
+				   LY_MSG("Can't read news info.  News host %.20s responded: %.200s"),
 				   NewsHost, response_text);
 		    } else {
 			HTSprintf0(&dbuf,
-				   gettext("Can't read news info, empty response from host %s"),
+				   LY_MSG("Can't read news info, empty response from host %s"),
 				   NewsHost);
 		    }
 		    return HTLoadError(stream, 500, dbuf);
@@ -3050,7 +3045,7 @@ void HTClearNNTPAuthInfo(void)
 {
     /*
      * Need code to check cached documents and do something to ensure that any
-     * protected documents no longer can be accessed without a new retrieval. 
+     * protected documents no longer can be accessed without a new retrieval.
      * - FM
      */
 

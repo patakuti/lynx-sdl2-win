@@ -1,9 +1,9 @@
 /*
- * $LynxId: userdefs.h,v 1.396 2024/05/31 22:09:16 tom Exp $
+ * $LynxId: userdefs.h,v 1.425 2025/09/17 23:31:59 tom Exp $
  *
  * Lynx - Hypertext navigation system
  *
- *   Copyright 1996-2023,2024 Thomas E. Dickey and Lynx Developers Group
+ *   Copyright 1996-2024,2025 Thomas E. Dickey and Lynx Developers Group
  *   Note: GNU General Public License is not a copyright.
  *
  *   (c) Copyright 1992, 1993, 1994 University of Kansas
@@ -1240,8 +1240,16 @@
 #define DEFAULT_KEYPAD_MODE	NUMBERS_AS_ARROWS
 
 /********************************
+ * Set a compiled-in default for the LOCALE_CHARSET option in lynx.cfg,
+ * which may be overridden by the configure script or makefiles.
+ */
+#ifndef DEFAULT_LOCALE_CHARSET
+#define DEFAULT_LOCALE_CHARSET  FALSE
+#endif
+
+/********************************
  * If PREVENT_KEYBOARD_WRAPAROUND is defined, using the keyboard to
- * move past the end (or beginning) of a page results in a warning. 
+ * move past the end (or beginning) of a page results in a warning.
  * Otherwise, such motions cause the cursor to wrap from bottom to top
  * (or top to bottom) of page.  Note that for pages which fit
  * completely on one screen, wraparound always occurs, so this only
@@ -1451,10 +1459,10 @@
  */
 
 #define LYNX_NAME     "Lynx"
-#define LYNX_VERSION  "2.9.2"
+#define LYNX_VERSION  "2.9.2u"
 #define LYNX_WWW_HOME "https://lynx.invisible-island.net/"
 #define LYNX_WWW_DIST "https://lynx.invisible-island.net/current/"
-#define LYNX_DATE     "31 May 2024"
+#define LYNX_DATE     "17 Sep 2025"
 
 #ifdef UNICODE
 #define W32_STRING(s) L##s

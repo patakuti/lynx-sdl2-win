@@ -1,5 +1,5 @@
 /*
- * $LynxId: LYReadCFG.c,v 1.201 2024/03/17 23:04:33 tom Exp $
+ * $LynxId: LYReadCFG.c,v 1.205 2025/01/08 00:38:28 tom Exp $
  */
 #ifndef NO_RULES
 #include <HTRules.h>
@@ -86,10 +86,10 @@ static void free_item_list_item(lynx_list_item_type **list,
     lynx_list_item_type *prev;
     lynx_list_item_type *cur;
 
-    for (cur = *list, prev = 0; cur != 0; prev = cur, cur = cur->next) {
+    for (cur = *list, prev = NULL; cur != NULL; prev = cur, cur = cur->next) {
 	if (cur == ptr) {
 
-	    if (prev != 0)
+	    if (prev != NULL)
 		prev->next = cur->next;
 	    else
 		*list = cur->next;
@@ -105,7 +105,7 @@ static void free_item_list_item(lynx_list_item_type **list,
 
 static void free_item_list(lynx_list_item_type **ptr)
 {
-    while (*ptr != 0) {
+    while (*ptr != NULL) {
 	free_item_list_item(ptr, *ptr);
     }
 }
@@ -137,7 +137,7 @@ static const char *parse_list_bool(BOOL *target, const char *source)
 
     if (*source != '\0') {
 	char temp[20];
-	size_t len = ((result != 0)
+	size_t len = ((result != NULL)
 		      ? (size_t) (result - source)
 		      : strlen(source));
 
@@ -172,7 +172,7 @@ static const char *parse_list_string(char **target, const char *source)
     result = find_colon(source);
 
     if (*source != '\0') {
-	const char *next = ((result == 0)
+	const char *next = ((result == NULL)
 			    ? (source + strlen(source))
 			    : result);
 
@@ -205,11 +205,11 @@ static void add_item_to_list(char *buffer,
      * field, and act properly when found depending if external environment
      * $DISPLAY variable is set.
      */
-    if ((colon = find_colon(buffer)) == 0) {
+    if ((colon = find_colon(buffer)) == NULL) {
 	return;
     }
     for (last_colon = colon;
-	 (colon = find_colon(last_colon + 1)) != 0;
+	 (colon = find_colon(last_colon + 1)) != NULL;
 	 last_colon = colon) {
 	;
     }
@@ -303,7 +303,7 @@ lynx_list_item_type *find_item_by_number(lynx_list_item_type *list_ptr,
 {
     int value = atoi(number);
 
-    while (value-- >= 0 && list_ptr != 0) {
+    while (value-- >= 0 && list_ptr != NULL) {
 	list_ptr = list_ptr->next;
     }
     return list_ptr;
@@ -314,7 +314,7 @@ int match_item_by_name(lynx_list_item_type *ptr,
 		       int only_overriders)
 {
     return
-	(ptr->command != 0
+	(ptr->command != NULL
 	 && !strncasecomp(ptr->name, name, (int) strlen(ptr->name))
 	 && (only_overriders ? ptr->override_action : 1));
 }
@@ -434,14 +434,14 @@ static void exit_with_color_syntax(char *error_line)
 {
     unsigned int i;
 
-    fprintf(stderr, gettext("\
+    fputs(gettext("\
 Syntax Error parsing COLOR in configuration file:\n\
 The line must be of the form:\n\
 COLOR:INTEGER:FOREGROUND:BACKGROUND\n\
 \n\
 Here FOREGROUND and BACKGROUND must be one of:\n\
-The special strings 'nocolor' or 'default', or\n")
-	);
+The special strings 'nocolor' or 'default', or\n"),
+	  stderr);
     for (i = 0; i < 16; i += 4) {
 	fprintf(stderr, "%16s %16s %16s %16s\n",
 		Color_Strings[i], Color_Strings[i + 1],
@@ -460,7 +460,7 @@ static void parse_color(char *buffer)
 {
     int color;
     const char *fg, *bg;
-    char *temp_fg = 0;
+    char *temp_fg = NULL;
 
     /*
      * We are expecting a line of the form:
@@ -508,20 +508,20 @@ static Config_Enum tbl_abort_source_cache[] = {
 #endif
 /* *INDENT-ON* */
 
-#define PARSE_ADD(n,v)   {n, CONF_ADD_ITEM,    UNION_ADD(v), 0}
-#define PARSE_SET(n,v)   {n, CONF_BOOL,        UNION_SET(v), 0}
+#define PARSE_ADD(n,v)   {n, CONF_ADD_ITEM,    UNION_ADD(v), NULL}
+#define PARSE_SET(n,v)   {n, CONF_BOOL,        UNION_SET(v), NULL}
 #define PARSE_ENU(n,v,t) {n, CONF_ENUM,        UNION_INT(v), t}
-#define PARSE_INT(n,v)   {n, CONF_INT,         UNION_INT(v), 0}
-#define PARSE_TIM(n,v)   {n, CONF_TIME,        UNION_INT(v), 0}
-#define PARSE_STR(n,v)   {n, CONF_STR,         UNION_STR(v), 0}
-#define PARSE_PRG(n,v)   {n, CONF_PRG,         UNION_DEF(v), 0}
-#define PARSE_Env(n,v)   {n, CONF_ENV,         UNION_ENV(v), 0}
-#define PARSE_ENV(n,v)   {n, CONF_ENV2,        UNION_ENV(v), 0}
-#define PARSE_FUN(n,v)   {n, CONF_FUN,         UNION_FUN(v), 0}
-#define PARSE_REQ(n,v)   {n, CONF_INCLUDE,     UNION_FUN(v), 0}
-#define PARSE_LST(n,v)   {n, CONF_ADD_STRING,  UNION_LST(v), 0}
-#define PARSE_DEF(n,v)   {n, CONF_ADD_TRUSTED, UNION_DEF(v), 0}
-#define PARSE_NIL        {NULL, CONF_NIL,      UNION_DEF(0), 0}
+#define PARSE_INT(n,v)   {n, CONF_INT,         UNION_INT(v), NULL}
+#define PARSE_TIM(n,v)   {n, CONF_TIME,        UNION_INT(v), NULL}
+#define PARSE_STR(n,v)   {n, CONF_STR,         UNION_STR(v), NULL}
+#define PARSE_PRG(n,v)   {n, CONF_PRG,         UNION_DEF(v), NULL}
+#define PARSE_Env(n,v)   {n, CONF_ENV,         UNION_ENV(v), NULL}
+#define PARSE_ENV(n,v)   {n, CONF_ENV2,        UNION_ENV(v), NULL}
+#define PARSE_FUN(n,v)   {n, CONF_FUN,         UNION_FUN(v), NULL}
+#define PARSE_REQ(n,v)   {n, CONF_INCLUDE,     UNION_FUN(v), NULL}
+#define PARSE_LST(n,v)   {n, CONF_ADD_STRING,  UNION_LST(v), NULL}
+#define PARSE_DEF(n,v)   {n, CONF_ADD_TRUSTED, UNION_DEF(v), NULL}
+#define PARSE_NIL        {NULL, CONF_NIL,      UNION_DEF(0), NULL}
 
 typedef enum {
     CONF_NIL = 0
@@ -606,7 +606,7 @@ static int outgoing_mail_charset_fun(char *value)
 static int assumed_color_fun(char *buffer)
 {
     const char *fg = buffer, *bg;
-    char *temp_fg = 0;
+    char *temp_fg = NULL;
 
     if (LYuse_default_colors) {
 
@@ -761,14 +761,14 @@ static int keymap_fun(char *key)
 	} else if (efunc && strncasecomp(efunc + 1, "DIRED", 5) == 0) {
 	    if (!remap(key, strtok(func, " \t\n:#"), TRUE)) {
 		fprintf(stderr,
-			gettext("key remapping of %s to %s for %s failed\n"),
+			LY_MSG("key remapping of %s to %s for %s failed\n"),
 			key, func, efunc + 1);
 	    } else if (!strcmp("TOGGLE_HELP", func)) {
 		LYUseNoviceLineTwo = FALSE;
 	    }
 	    return 0;
 	} else if (!remap(key, strtok(func, " \t\n:#"), FALSE)) {
-	    fprintf(stderr, gettext("key remapping of %s to %s failed\n"),
+	    fprintf(stderr, LY_MSG("key remapping of %s to %s failed\n"),
 		    key, func);
 	} else {
 	    if (!strcmp("TOGGLE_HELP", func))
@@ -789,7 +789,7 @@ static int keymap_fun(char *key)
 			select_edi = (int) strtol(sselect_edi, endp, 10);
 		    if (**endp != '\0') {
 			fprintf(stderr,
-				gettext("invalid line-editor selection %s for key %s, selecting all\n"),
+				LY_MSG("invalid line-editor selection %s for key %s, selecting all\n"),
 				sselect_edi, key);
 			select_edi = 0;
 		    }
@@ -814,7 +814,7 @@ static int keymap_fun(char *key)
 		    }
 		    if (!success)
 			fprintf(stderr,
-				gettext("setting of line-editor binding for key %s (0x%x) to 0x%x for %s failed\n"),
+				LY_MSG("setting of line-editor binding for key %s (0x%x) to 0x%x for %s failed\n"),
 				key,
 				(unsigned) lkc,
 				(unsigned) lec,
@@ -829,14 +829,14 @@ static int keymap_fun(char *key)
 		if (!success) {
 		    if (lec != -1) {
 			fprintf(stderr,
-				gettext("setting of line-editor binding for key %s (0x%x) to 0x%x for %s failed\n"),
+				LY_MSG("setting of line-editor binding for key %s (0x%x) to 0x%x for %s failed\n"),
 				key,
 				(unsigned) lkc,
 				(unsigned) lec,
 				efunc);
 		    } else {
 			fprintf(stderr,
-				gettext("setting of line-editor binding for key %s (0x%x) for %s failed\n"),
+				LY_MSG("setting of line-editor binding for key %s (0x%x) for %s failed\n"),
 				key,
 				(unsigned) lkc,
 				efunc);
@@ -934,7 +934,7 @@ static int cern_rulesfile_fun(char *value)
 	return 0;
     }
     fprintf(stderr,
-	    gettext("Lynx: cannot start, CERN rules file %s is not available\n"),
+	    LY_MSG("Lynx: cannot start, CERN rules file %s is not available\n"),
 	    non_empty(rulesfile2) ? rulesfile2 : gettext("(no name)"));
     exit_immediately(EXIT_FAILURE);
     return 0;			/* though redundant, for compiler-warnings */
@@ -1092,7 +1092,7 @@ static int system_editor_fun(char *value)
 }
 
 #define SetViewer(mime_type, viewer) \
-    HTSetPresentation(mime_type, viewer, 0, 1.0, 3.0, 0.0, 0L, mediaCFG)
+    HTSetPresentation(mime_type, viewer, NULL, 1.0, 3.0, 0.0, 0L, mediaCFG)
 
 static int viewer_fun(char *value)
 {
@@ -1246,7 +1246,7 @@ static int external_fun(char *str)
 static void html_src_bad_syntax(char *value,
 				char *option_name)
 {
-    char *buf = 0;
+    char *buf = NULL;
 
     HTSprintf0(&buf, "HTMLSRC_%s", option_name);
     LYUpperCase(buf);
@@ -1493,7 +1493,7 @@ static Config_Type Config_Table [] =
 #endif /* USE_PERSISTENT_COOKIES */
      PARSE_STR(RC_COOKIE_STRICT_INVALID_DOMAIN, LYCookieSStrictCheckDomains),
      PARSE_ENU(RC_COOKIE_VERSION,       cookie_version, tbl_cookie_version),
-     PARSE_Env(RC_CSO_PROXY,            0),
+     PARSE_Env(RC_CSO_PROXY,            NULL),
 #ifdef VMS
      PARSE_PRG(RC_CSWING_PATH,          ppCSWING),
 #endif
@@ -1526,7 +1526,7 @@ static Config_Type Config_Table [] =
      PARSE_ADD(RC_EXTERNAL,             externals),
      PARSE_FUN(RC_EXTERNAL_MENU,        external_fun),
 #endif
-     PARSE_Env(RC_FINGER_PROXY,         0),
+     PARSE_Env(RC_FINGER_PROXY,         NULL),
 #if defined(_WINDOWS)	/* 1998/10/05 (Mon) 17:34:15 */
      PARSE_SET(RC_FOCUS_WINDOW,         focus_window),
 #endif
@@ -1545,10 +1545,10 @@ static Config_Type Config_Table [] =
 #ifndef DISABLE_FTP
      PARSE_SET(RC_FTP_PASSIVE,          ftp_passive),
 #endif
-     PARSE_Env(RC_FTP_PROXY,            0),
+     PARSE_Env(RC_FTP_PROXY,            NULL),
      PARSE_STR(RC_GLOBAL_EXTENSION_MAP, global_extension_map),
      PARSE_STR(RC_GLOBAL_MAILCAP,       global_type_map),
-     PARSE_Env(RC_GOPHER_PROXY,         0),
+     PARSE_Env(RC_GOPHER_PROXY,         NULL),
      PARSE_SET(RC_GOTOBUFFER,           goto_buffer),
      PARSE_PRG(RC_GZIP_PATH,            ppGZIP),
      PARSE_SET(RC_GUESS_SCHEME,         LYGuessScheme),
@@ -1564,9 +1564,9 @@ static Config_Type Config_Table [] =
      PARSE_FUN(RC_HTMLSRC_TAGNAME_XFORM, read_htmlsrc_tagname_xform),
 #endif
      PARSE_FUN(RC_HTTP_PROTOCOL,        get_http_protocol),
-     PARSE_Env(RC_HTTP_PROXY,           0),
-     PARSE_Env(RC_HTTPS_PROXY,          0),
-     PARSE_REQ(RC_INCLUDE,              0),
+     PARSE_Env(RC_HTTP_PROXY,           NULL),
+     PARSE_Env(RC_HTTPS_PROXY,          NULL),
+     PARSE_REQ(RC_INCLUDE,              NULL),
      PARSE_PRG(RC_INFLATE_PATH,         ppINFLATE),
      PARSE_TIM(RC_INFOSECS,             InfoSecs),
      PARSE_PRG(RC_INSTALL_PATH,         ppINSTALL),
@@ -1636,11 +1636,11 @@ static Config_Type Config_Table [] =
      PARSE_FUN(RC_NEWS_CHUNK_SIZE,      news_chunk_size_fun),
      PARSE_FUN(RC_NEWS_MAX_CHUNK,       news_max_chunk_fun),
      PARSE_FUN(RC_NEWS_POSTING,         news_posting_fun),
-     PARSE_Env(RC_NEWS_PROXY,           0),
-     PARSE_Env(RC_NEWSPOST_PROXY,       0),
-     PARSE_Env(RC_NEWSREPLY_PROXY,      0),
-     PARSE_Env(RC_NNTP_PROXY,           0),
-     PARSE_ENV(RC_NNTPSERVER,           0), /* actually NNTPSERVER */
+     PARSE_Env(RC_NEWS_PROXY,           NULL),
+     PARSE_Env(RC_NEWSPOST_PROXY,       NULL),
+     PARSE_Env(RC_NEWSREPLY_PROXY,      NULL),
+     PARSE_Env(RC_NNTP_PROXY,           NULL),
+     PARSE_ENV(RC_NNTPSERVER,           NULL), /* actually NNTPSERVER */
 #endif
      PARSE_SET(RC_NUMBER_FIELDS_ON_LEFT,number_fields_on_left),
      PARSE_SET(RC_NUMBER_LINKS_ON_LEFT, number_links_on_left),
@@ -1653,7 +1653,7 @@ static Config_Type Config_Table [] =
      PARSE_SET(RC_NO_ISMAP_IF_USEMAP,   LYNoISMAPifUSEMAP),
      PARSE_SET(RC_NO_MARGINS,           no_margins),
      PARSE_SET(RC_NO_PAUSE,             no_pause),
-     PARSE_Env(RC_NO_PROXY,             0),
+     PARSE_Env(RC_NO_PROXY,             NULL),
      PARSE_SET(RC_NO_REFERER_HEADER,    LYNoRefererHeader),
      PARSE_SET(RC_NO_TABLE_CENTER,      no_table_center),
      PARSE_SET(RC_NO_TITLE,             no_title),
@@ -1725,9 +1725,9 @@ static Config_Type Config_Table [] =
      PARSE_SET(RC_SHOW_CURSOR,          LYShowCursor),
      PARSE_STR(RC_SHOW_KB_NAME,         LYTransferName),
      PARSE_ENU(RC_SHOW_KB_RATE,         LYTransferRate, tbl_transfer_rate),
-     PARSE_Env(RC_SNEWS_PROXY,          0),
-     PARSE_Env(RC_SNEWSPOST_PROXY,      0),
-     PARSE_Env(RC_SNEWSREPLY_PROXY,     0),
+     PARSE_Env(RC_SNEWS_PROXY,          NULL),
+     PARSE_Env(RC_SNEWSPOST_PROXY,      NULL),
+     PARSE_Env(RC_SNEWSREPLY_PROXY,     NULL),
      PARSE_SET(RC_SOFT_DQUOTES,         soft_dquotes),
 #ifdef USE_SOURCE_CACHE
      PARSE_ENU(RC_SOURCE_CACHE,         LYCacheSource, tbl_source_cache),
@@ -1789,13 +1789,14 @@ static Config_Type Config_Table [] =
      PARSE_SET(RC_VERBOSE_IMAGES,       verbose_img),
      PARSE_SET(RC_VI_KEYS_ALWAYS_ON,    vi_keys),
      PARSE_FUN(RC_VIEWER,               viewer_fun),
-     PARSE_Env(RC_WAIS_PROXY,           0),
+     PARSE_Env(RC_WAIS_PROXY,           NULL),
      PARSE_SET(RC_WAIT_VIEWER_TERMINATION, wait_viewer_termination),
      PARSE_SET(RC_WITH_BACKSPACES,      with_backspaces),
      PARSE_STR(RC_XLOADIMAGE_COMMAND,   XLoadImageCommand),
      PARSE_SET(RC_XHTML_PARSING,        LYxhtml_parsing),
      PARSE_PRG(RC_ZCAT_PATH,            ppZCAT),
      PARSE_PRG(RC_ZIP_PATH,             ppZIP),
+     PARSE_PRG(RC_ZSTD_PATH,            ppZSTD),
 
      PARSE_NIL
 };
@@ -1814,16 +1815,16 @@ void free_lynx_cfg(void)
 {
     Config_Type *tbl;
 
-    for (tbl = Config_Table; tbl->name != 0; tbl++) {
+    for (tbl = Config_Table; tbl->name != NULL; tbl++) {
 	ParseUnionPtr q = ParseUnionOf(tbl);
 
 	switch (tbl->type) {
 	case CONF_ENV:
-	    if (q->str_value != 0) {
+	    if (q->str_value != NULL) {
 		char *name = *(q->str_value);
 		char *eqls = StrChr(name, '=');
 
-		if (eqls != 0) {
+		if (eqls != NULL) {
 		    *eqls = 0;
 #ifdef VMS
 		    Define_VMSLogical(name, NULL);
@@ -1862,7 +1863,7 @@ static Config_Type *lookup_config(const char *name)
     Config_Type *tbl = Config_Table;
     char ch = (char) TOUPPER(*name);
 
-    while (tbl->name != 0) {
+    while (tbl->name != NULL) {
 	char ch1 = tbl->name[0];
 
 	if ((ch == TOUPPER(ch1))
@@ -1889,16 +1890,16 @@ static char *actual_filename(const char *cfg_filename,
     char *my_filename = NULL;
 
     if (!LYisAbsPath(cfg_filename)
-	&& !(parent_filename == 0 && LYCanReadFile(cfg_filename))) {
+	&& !(parent_filename == NULL && LYCanReadFile(cfg_filename))) {
 	if (LYIsTilde(cfg_filename[0]) && LYIsPathSep(cfg_filename[1])) {
 	    HTSprintf0(&my_filename, "%s%s", Home_Dir(), cfg_filename + 1);
 	} else {
-	    if (parent_filename != 0) {
+	    if (parent_filename != NULL) {
 		StrAllocCopy(my_filename, parent_filename);
 		*LYPathLeaf(my_filename) = '\0';
 		StrAllocCat(my_filename, cfg_filename);
 	    }
-	    if (my_filename == 0 || !LYCanReadFile(my_filename)) {
+	    if (my_filename == NULL || !LYCanReadFile(my_filename)) {
 		StrAllocCopy(my_filename, dft_filename);
 		*LYPathLeaf(my_filename) = '\0';
 		StrAllocCat(my_filename, cfg_filename);
@@ -1952,25 +1953,25 @@ BOOL LYSetConfigValue(const char *name,
     char *value = NULL;
     Config_Type *tbl = lookup_config(name);
     ParseUnionPtr q = ParseUnionOf(tbl);
-    char *temp_name = 0;
-    char *temp_value = 0;
+    char *temp_name = NULL;
+    char *temp_value = NULL;
 
     if (param == NULL)
 	param = "";
     StrAllocCopy(value, param);
     switch (tbl->type) {
     case CONF_BOOL:
-	if (q->set_value != 0)
+	if (q->set_value != NULL)
 	    *(q->set_value) = is_true(value);
 	break;
 
     case CONF_FUN:
-	if (q->fun_value != 0)
+	if (q->fun_value != NULL)
 	    (*(q->fun_value)) (value);
 	break;
 
     case CONF_TIME:
-	if (q->int_value != 0) {
+	if (q->int_value != NULL) {
 	    float ival;
 
 	    if (1 == LYscanFloat(value, &ival)) {
@@ -1980,12 +1981,12 @@ BOOL LYSetConfigValue(const char *name,
 	break;
 
     case CONF_ENUM:
-	if (tbl->table != 0)
+	if (tbl->table != NULL)
 	    LYgetEnum(tbl->table, value, q->int_value);
 	break;
 
     case CONF_INT:
-	if (q->int_value != 0) {
+	if (q->int_value != NULL) {
 	    int ival;
 
 	    if (1 == sscanf(value, "%d", &ival))
@@ -1994,7 +1995,7 @@ BOOL LYSetConfigValue(const char *name,
 	break;
 
     case CONF_STR:
-	if (q->str_value != 0)
+	if (q->str_value != NULL)
 	    StrAllocCopy(*(q->str_value), value);
 	break;
 
@@ -2007,14 +2008,14 @@ BOOL LYSetConfigValue(const char *name,
 	    else
 		LYUpperCase(temp_name);
 
-	    if (LYGetEnv(temp_name) == 0) {
+	    if (LYGetEnv(temp_name) == NULL) {
 #ifdef VMS
 		Define_VMSLogical(temp_name, value);
 #else
-		if (q->str_value == 0) {
+		if (q->str_value == NULL) {
 		    q->str_value = typecalloc(char *);
 
-		    if (q->str_value == 0)
+		    if (q->str_value == NULL)
 			outofmem(__FILE__, "LYSetConfigValue");
 		}
 
@@ -2026,7 +2027,7 @@ BOOL LYSetConfigValue(const char *name,
 	}
 	break;
     case CONF_ADD_ITEM:
-	if (q->add_value != 0)
+	if (q->add_value != NULL)
 	    add_item_to_list(value,
 			     q->add_value,
 			     (q->add_value == &printers),
@@ -2080,7 +2081,7 @@ static void do_read_cfg(const char *cfg_filename,
 			optidx_set_t *allowed)
 {
     FILE *fp;
-    char *buffer = 0;
+    char *buffer = NULL;
 
     CTRACE((tfp, "Loading cfg file '%s'.\n", cfg_filename));
 
@@ -2090,10 +2091,10 @@ static void do_read_cfg(const char *cfg_filename,
      */
     if (nesting_level > 10) {
 	fprintf(stderr,
-		gettext("More than %d nested lynx.cfg includes -- perhaps there is a loop?!?\n"),
+		LY_MSG("More than %d nested lynx.cfg includes -- perhaps there is a loop?!?\n"),
 		nesting_level - 1);
-	fprintf(stderr, gettext("Last attempted include was '%s',\n"), cfg_filename);
-	fprintf(stderr, gettext("included from '%s'.\n"), parent_filename);
+	fprintf(stderr, LY_MSG("Last attempted include was '%s',\n"), cfg_filename);
+	fprintf(stderr, LY_MSG("included from '%s'.\n"), parent_filename);
 	exit_immediately(EXIT_FAILURE);
     }
     /*
@@ -2103,7 +2104,7 @@ static void do_read_cfg(const char *cfg_filename,
 	CTRACE((tfp, "No filename following -cfg switch!\n"));
 	return;
     }
-    if ((fp = LYOpenCFG(cfg_filename, parent_filename, LYNX_CFG_FILE)) == 0) {
+    if ((fp = LYOpenCFG(cfg_filename, parent_filename, LYNX_CFG_FILE)) == NULL) {
 	CTRACE((tfp, "lynx.cfg file not found as '%s'\n", cfg_filename));
 	return;
     }
@@ -2118,7 +2119,7 @@ static void do_read_cfg(const char *cfg_filename,
 	time(&t);
 	printf("### %s %s, at %s", LYNX_NAME, LYNX_VERSION, ctime(&t));
     }
-    while (LYSafeGets(&buffer, fp) != 0) {
+    while (LYSafeGets(&buffer, fp) != NULL) {
 	char *name, *value;
 	char *cp;
 	Config_Type *tbl;
@@ -2137,7 +2138,7 @@ static void do_read_cfg(const char *cfg_filename,
 	    continue;
 
 	/* Significant lines are of the form KEYWORD:WHATEVER */
-	if ((value = StrChr(name, ':')) == 0) {
+	if ((value = StrChr(name, ':')) == NULL) {
 	    /* fprintf (stderr, "Bad line-- no :\n"); */
 	    CTRACE((tfp, "LYReadCFG: missing ':' %s\n", name));
 	    continue;
@@ -2153,9 +2154,9 @@ static void do_read_cfg(const char *cfg_filename,
 	 * only if preceded by a space character but is not followed by a
 	 * colon.  -- JED)
 	 */
-	if ((cp = strrchr(value, ':')) == 0)
+	if ((cp = strrchr(value, ':')) == NULL)
 	    cp = value;
-	if ((cp = StrChr(cp, '#')) != 0) {
+	if ((cp = StrChr(cp, '#')) != NULL) {
 	    cp--;
 	    if (isspace(UCH(*cp)))
 		*cp = 0;
@@ -2163,7 +2164,7 @@ static void do_read_cfg(const char *cfg_filename,
 
 	CTRACE2(TRACE_CFG, (tfp, "LYReadCFG %s:%s\n", name, value));
 	tbl = lookup_config(name);
-	if (tbl->name == 0) {
+	if (tbl->name == NULL) {
 	    /* lynx ignores unknown keywords */
 	    CTRACE((tfp, "LYReadCFG: ignored %s:%s\n", name, value));
 	    continue;
@@ -2183,7 +2184,7 @@ static void do_read_cfg(const char *cfg_filename,
 	}
 
 	(void) ParseUnionOf(tbl);
-	switch ((fp0 != 0 && tbl->type != CONF_INCLUDE)
+	switch ((fp0 != NULL && tbl->type != CONF_INCLUDE)
 		? CONF_NIL
 		: tbl->type) {
 	case CONF_BOOL:
@@ -2212,16 +2213,16 @@ static void do_read_cfg(const char *cfg_filename,
 		char *cp1 = NULL;
 		const char *sep = NULL;
 
-		if ((p1 = strstr(value, sep = " for ")) != 0
+		if ((p1 = strstr(value, sep = " for ")) != NULL
 #if defined(UNIX) && !defined(USE_DOS_DRIVES)
-		    || (p1 = strstr(value, sep = ":")) != 0
+		    || (p1 = strstr(value, sep = ":")) != NULL
 #endif
 		    ) {
 		    *p1 = '\0';
 		    p1 += strlen(sep);
 		}
 #ifndef NO_CONFIG_INFO
-		if (fp0 != 0 && !no_lynxcfg_xinfo) {
+		if (fp0 != NULL && !no_lynxcfg_xinfo) {
 		    char *my_file = actual_filename(value, cfg_filename, LYNX_CFG_FILE);
 
 		    LYLocalFileToURL(&url, my_file);
@@ -2245,7 +2246,7 @@ static void do_read_cfg(const char *cfg_filename,
 			*p2 = 0;
 
 			tbl2 = lookup_config(p1);
-			if (tbl2->name == 0) {
+			if (tbl2->name == NULL) {
 			    if (fp0 == NULL)
 				fprintf(stderr,
 					"unknown option name %s in %s\n",
@@ -2287,7 +2288,7 @@ static void do_read_cfg(const char *cfg_filename,
 		 * of allowed options in <ul>.  Option names will be uppercased.
 		 * FIXME:  uppercasing option names can be considered redundant.
 		 */
-		if (fp0 != 0 && !no_lynxcfg_xinfo && resultant_set) {
+		if (fp0 != NULL && !no_lynxcfg_xinfo && resultant_set) {
 		    char *buf = NULL;
 		    unsigned i;
 
@@ -2305,7 +2306,7 @@ static void do_read_cfg(const char *cfg_filename,
 		do_read_cfg(value, cfg_filename, nesting_level + 1, fp0, resultant_set);
 
 #ifndef NO_CONFIG_INFO
-		if (fp0 != 0 && !no_lynxcfg_xinfo) {
+		if (fp0 != NULL && !no_lynxcfg_xinfo) {
 		    fprintf(fp0, "    #&lt;end of %s&gt;\n\n", cp1);
 		    FREE(url);
 		    FREE(cp1);
@@ -2315,7 +2316,7 @@ static void do_read_cfg(const char *cfg_filename,
 	    break;
 
 	default:
-	    if (fp0 != 0) {
+	    if (fp0 != NULL) {
 		if (StrChr(value, '&') || StrChr(value, '<')) {
 		    char *cp1 = NULL;
 
@@ -2339,11 +2340,11 @@ static void do_read_cfg(const char *cfg_filename,
      * block presentation of a download menu with those always_enabled options
      * still available.  - FM
      */
-    if (downloaders != 0) {
+    if (downloaders != NULL) {
 	lynx_list_item_type *cur_download;
 
 	cur_download = downloaders;
-	while (cur_download != 0) {
+	while (cur_download != NULL) {
 	    if (cur_download->always_enabled) {
 		override_no_download = TRUE;
 		break;
@@ -2390,7 +2391,7 @@ static void extra_cfg_link(FILE *fp, const char *href,
 #endif /* NO_CONFIG_INFO */
 
 /*
- * Show rendered lynx.cfg data without comments, LYNXCFG:/ internal page. 
+ * Show rendered lynx.cfg data without comments, LYNXCFG:/ internal page.
  * Called from getfile() cycle:  we create and load the page just in place and
  * return to mainloop().
  */
@@ -2398,7 +2399,7 @@ int lynx_cfg_infopage(DocInfo *newdoc)
 {
     static char tempfile[LY_MAXPATH] = "\0";
     DocAddress WWWDoc;		/* need on exit */
-    char *temp = 0;
+    char *temp = NULL;
     char *cp1 = NULL;
     FILE *fp0;
 
@@ -2443,7 +2444,7 @@ int lynx_cfg_infopage(DocInfo *newdoc)
 
 	    /*
 	     * Working out of getfile() cycle we reset *no_cache manually here
-	     * so HTLoadAbsolute() will return "Document already in memory": 
+	     * so HTLoadAbsolute() will return "Document already in memory":
 	     * it was forced reloading obsolete file again without this
 	     * (overhead).
 	     *
@@ -2468,7 +2469,7 @@ int lynx_cfg_infopage(DocInfo *newdoc)
      * session from a situation where the file is corrupted (for example
      * truncated because the file system was full when it was first created -
      * lynx doesn't check for write errors below), short of manual complete
-     * removal or perhaps forcing regeneration with LYNXCFG://reload. 
+     * removal or perhaps forcing regeneration with LYNXCFG://reload.
      * Similarly, there would be no simple way to get a different page if
      * user_mode has changed to Advanced after the file was first generated in
      * a non-Advanced mode (the difference being in whether the page includes
@@ -2487,9 +2488,9 @@ int lynx_cfg_infopage(DocInfo *newdoc)
 	    FREE(lynxcfginfo_url);	/* flag to code below to try again - kw */
 	}
     }
-    if (lynxcfginfo_url == 0) {
+    if (lynxcfginfo_url == NULL) {
 
-	if ((fp0 = InternalPageFP(tempfile, TRUE)) == 0)
+	if ((fp0 = InternalPageFP(tempfile, TRUE)) == NULL)
 	    return (NOT_FOUND);
 
 	LYLocalFileToURL(&lynxcfginfo_url, tempfile);
@@ -2575,7 +2576,7 @@ int lynx_cfg_infopage(DocInfo *newdoc)
 #endif /* !NO_CONFIG_INFO */
 
 	    fprintf(fp0, "<em>%s</em>\n\n",
-		    gettext("The following is read from your lynx.cfg file."));
+		    LY_MSG("The following is read from your lynx.cfg file."));
 
 	/*
 	 * Process the configuration file.
@@ -2647,7 +2648,7 @@ int lynx_compile_opts(DocInfo *newdoc)
 	}
     }
     if (configinfo_url == NULL) {
-	if ((fp0 = InternalPageFP(tempfile, TRUE)) == 0)
+	if ((fp0 = InternalPageFP(tempfile, TRUE)) == NULL)
 	    return (NOT_FOUND);
 
 	LYLocalFileToURL(&configinfo_url, tempfile);

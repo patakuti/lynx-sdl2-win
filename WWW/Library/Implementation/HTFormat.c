@@ -1,5 +1,5 @@
 /*
- * $LynxId: HTFormat.c,v 1.97 2024/04/11 20:19:35 tom Exp $
+ * $LynxId: HTFormat.c,v 1.103 2025/07/25 19:26:58 tom Exp $
  *
  *		Manage different file formats			HTFormat.c
  *		=============================
@@ -15,7 +15,7 @@
 
 #define HTSTREAM_INTERNAL 1
 
-#include <HTUtils.h>
+#include <HTTLS.h>
 
 /* Implements:
 */
@@ -59,6 +59,10 @@ static float HTMaxSecs = 1e10;	/* No effective limit */
 
 #ifdef USE_BROTLI
 #include <brotli/decode.h>
+#endif
+
+#ifdef USE_ZSTD
+# include <zstd.h>
 #endif
 
 BOOL HTOutputSource = NO;	/* Flag: shortcut parser to stdout */
@@ -324,7 +328,7 @@ int HTGetSSLCharacter(void *handle)
 }
 #endif /* USE_SSL */
 
-/* Match maintype to any MIME type starting with maintype, for example: 
+/* Match maintype to any MIME type starting with maintype, for example:
  * image/gif should match image
  */
 static int half_match(char *trial_type, char *target)
@@ -351,14 +355,18 @@ static int half_match(char *trial_type, char *target)
  */
 static BOOL failsMailcap(HTPresentation *pres, HTParentAnchor *anchor)
 {
-    if (pres->testcommand != NULL &&
-	anchor != NULL &&
-	anchor->content_type_params != NULL) {
+    BOOL result = FALSE;
+
+    if (pres->testcommand != NULL) {
 	if (LYTestMailcapCommand(pres->testcommand,
-				 anchor->content_type_params) != 0)
-	    return TRUE;
+				 HTAtom_name(pres->rep),
+				 (anchor
+				  ? anchor->content_type_params
+				  : NULL)) != 0) {
+	    result = TRUE;
+	}
     }
-    return FALSE;
+    return result;
 }
 
 #define WWW_WILDCARD_REP_OUT HTAtom_for("*")
@@ -386,10 +394,10 @@ static HTPresentation *HTFindPresentation(HTFormat rep_in,
     int i;
     HTPresentation *pres;
     HTPresentation *match;
-    HTPresentation *strong_wildcard_match = 0;
-    HTPresentation *weak_wildcard_match = 0;
-    HTPresentation *last_default_match = 0;
-    HTPresentation *strong_subtype_wildcard_match = 0;
+    HTPresentation *strong_wildcard_match = NULL;
+    HTPresentation *weak_wildcard_match = NULL;
+    HTPresentation *last_default_match = NULL;
+    HTPresentation *strong_subtype_wildcard_match = NULL;
 
     CTRACE((tfp, THIS_FUNC ": Looking up presentation for %s to %s\n",
 	    HTAtom_name(rep_in), HTAtom_name(rep_out)));
@@ -656,7 +664,7 @@ void HTDisplayPartial(void)
     if (display_partial) {
 	/*
 	 * HText_getNumOfLines() = "current" number of complete lines received
-	 * NumOfLines_partial = number of lines at the moment of last repaint. 
+	 * NumOfLines_partial = number of lines at the moment of last repaint.
 	 * (we update NumOfLines_partial only when we repaint the display.)
 	 *
 	 * display_partial could only be enabled in HText_new() so a new
@@ -816,7 +824,7 @@ int HTCopy(HTParentAnchor *anchor,
 #ifdef UNIX
 		    /*
 		     * Treat what we've received already as the complete
-		     * transmission, but not without giving the user an alert. 
+		     * transmission, but not without giving the user an alert.
 		     * I don't know about all the different TCP stacks for VMS
 		     * etc., so this is currently only for UNIX.  - kw
 		     */
@@ -877,10 +885,10 @@ int HTCopy(HTParentAnchor *anchor,
 	}
 #endif /* NOT_ASCII */
 
-	header_length = anchor != 0 ? anchor->header_length : 0;
+	header_length = anchor != NULL ? anchor->header_length : 0;
 
 	(*targetClass.put_block) (sink, input_buffer, status);
-	if (anchor != 0 && anchor->inHEAD) {
+	if (anchor != NULL && anchor->inHEAD) {
 	    if (!suppress_readprogress) {
 		statusline(gettext("Reading headers..."));
 	    }
@@ -892,7 +900,7 @@ int HTCopy(HTParentAnchor *anchor,
 	     * HTMIME, which detects the end of the server headers.  There
 	     * may be additional (non-header) data in that block.
 	     */
-	    if (anchor != 0 && (anchor->header_length > header_length)) {
+	    if (anchor != NULL && (anchor->header_length > header_length)) {
 		int header = (int) (anchor->header_length - header_length);
 
 		CTRACE((tfp, "HTCopy read %" PRI_off_t " header bytes "
@@ -917,7 +925,7 @@ int HTCopy(HTParentAnchor *anchor,
 	if (limit > 0 && bytes >= limit)
 	    break;
     }				/* next bufferload */
-    if (anchor != 0) {
+    if (anchor != NULL) {
 	CTRACE((tfp, "HTCopy copied %"
 		PRI_off_t " actual, %"
 		PRI_off_t " limit\n", CAST_off_t (bytes), CAST_off_t (limit)));
@@ -1445,7 +1453,7 @@ static int HTBrFileCopy(FILE *brfp, HTStream *sink)
 	     * brotli library should return
 	     *  BROTLI_DECODER_RESULT_NEEDS_MORE_OUTPUT,
 	     * but actually returns
-	     *  BROTLI_DECODER_RESULT_ERROR 
+	     *  BROTLI_DECODER_RESULT_ERROR
 	     *
 	     * Accommodate possible improvements...
 	     */
@@ -1456,8 +1464,9 @@ static int HTBrFileCopy(FILE *brfp, HTStream *sink)
      * finally, pump that data into the output stream.
      */
     if (status2 == BROTLI_DECODER_RESULT_SUCCESS) {
-	CTRACE((tfp, THIS_FUNC ": decompressed %ld -> %ld (1:%.1f)\n",
-		brotli_size, normal_size,
+	CTRACE((tfp, THIS_FUNC ": decompressed %lu -> %lu (1:%.1f)\n",
+		(unsigned long) brotli_size,
+		(unsigned long) normal_size,
 		(double) normal_size / (double) brotli_size));
 	(*targetClass.put_block) (sink, normal_buffer, (int) normal_size);
 	bytes += status;
@@ -1477,7 +1486,110 @@ static int HTBrFileCopy(FILE *brfp, HTStream *sink)
     return rv;
 #undef THIS_FUNC
 }
-#endif /* USE_BZLIB */
+#endif /* USE_BROTLI */
+
+#ifdef USE_ZSTD
+/*	Push data from a zstd file pointer down a stream
+ *	-------------------------------------
+ *
+ *   This routine is responsible for creating and PRESENTING any
+ *   graphic (or other) objects described by the file.
+ *
+ *
+ *  State of file and target stream on entry:
+ *		      ZFILE (zfp) assumed open (should have zstd content),
+ *		      target (sink) assumed valid.
+ *
+ *  Return values:
+ *	HT_INTERRUPTED  Interruption after some data read.
+ *	HT_PARTIAL_CONTENT	Error after some data read.
+ *	-1		Error before any data read.
+ *	HT_LOADED	Normal end of file indication on reading.
+ *
+ *  State of file and target stream on return:
+ *	always		zfp still open, target stream still valid.
+ */
+static int HTZstdFileCopy(FILE *zfp, HTStream *sink)
+{
+    off_t bytes;
+    HTStreamClass targetClass;
+    ZSTD_DStream *izsp;
+    void *ibp, *obp;
+    size_t ibl, obl;
+    int rv;
+
+    rv = -1;
+
+    ibl = ZSTD_DStreamInSize();
+    ibp = malloc(ibl);
+    if (ibp == NULL)
+	goto jout0;
+
+    obl = ZSTD_DStreamOutSize();
+    obp = malloc(obl);
+    if (obp == NULL)
+	goto jout1;
+
+    if ((izsp = ZSTD_createDStream()) == NULL)
+	goto jout2;
+    ZSTD_initDStream(izsp);
+
+    /* Push the data down the stream */
+    targetClass = *(sink->isa);	/* Copy pointers to procedures */
+
+    /* read and inflate file, and push binary down sink */
+    HTReadProgress(bytes = 0, (off_t) 0);
+
+    for (;;) {
+	ZSTD_outBuffer ob;
+	ZSTD_inBuffer ib;
+	size_t r;
+
+	r = fread(ibp, 1, ibl, zfp);
+	if (r == 0) {
+	    if (feof(zfp))
+		rv = HT_LOADED;
+	    else if (bytes > 0)
+		rv = HT_PARTIAL_CONTENT;
+	    break;
+	}
+
+	ib.src = ibp;
+	ib.size = r;
+	ib.pos = 0;
+	ob.dst = obp;
+	ob.size = obl;
+	ob.pos = 0;
+
+	r = ZSTD_decompressStream(izsp, &ob, &ib);
+	if (ZSTD_isError(r)) {
+	    if (bytes > 0)
+		rv = HT_PARTIAL_CONTENT;
+	    break;
+	}
+
+	(*targetClass.put_block) (sink, ob.dst, (int) ob.pos);
+	bytes += (off_t) ob.pos;
+	HTReadProgress(bytes, (off_t) -1);
+	HTDisplayPartial();
+
+	if (HTCheckForInterrupt()) {
+	    _HTProgress(TRANSFER_INTERRUPTED);
+	    rv = HT_INTERRUPTED;
+	    break;
+	}
+    }				/* next bufferload */
+
+    ZSTD_freeDStream(izsp);
+  jout2:
+    free(obp);
+  jout1:
+    free(ibp);
+  jout0:
+    HTFinishDisplayPartial();
+    return rv;
+}
+#endif /* USE_ZSTD */
 
 /*	Push data from a socket down a stream STRIPPING CR
  *	--------------------------------------------------
@@ -1563,7 +1675,7 @@ int HTParseSocket(HTFormat rep_in,
     stream = HTStreamStack(rep_in, format_out, sink, anchor);
 
     if (!stream) {
-	char *buffer = 0;
+	char *buffer = NULL;
 
 	if (LYCancelDownload) {
 	    LYCancelDownload = FALSE;
@@ -1627,7 +1739,7 @@ int HTParseFile(HTFormat rep_in,
 	stream = HTStreamStack(rep_in, format_out, sink, anchor);
 
 	if (!stream || !stream->isa) {
-	    char *buffer = 0;
+	    char *buffer = NULL;
 
 	    if (LYCancelDownload) {
 		LYCancelDownload = FALSE;
@@ -1699,7 +1811,7 @@ int HTParseMem(HTFormat rep_in,
 
     stream = HTStreamStack(rep_in, format_out, sink, anchor);
     if (!stream || !stream->isa) {
-	char *buffer = 0;
+	char *buffer = NULL;
 
 	HTSprintf0(&buffer, CANNOT_CONVERT_I_TO_O,
 		   HTAtom_name(rep_in), HTAtom_name(format_out));
@@ -1768,7 +1880,7 @@ int HTParseGzFile(HTFormat rep_in,
     stream = HTStreamStack(rep_in, format_out, sink, anchor);
 
     if (!stream || !stream->isa) {
-	char *buffer = 0;
+	char *buffer = NULL;
 
 	HTCloseGzFile(gzfp);
 	if (LYCancelDownload) {
@@ -1841,7 +1953,7 @@ int HTParseZzFile(HTFormat rep_in,
     stream = HTStreamStack(rep_in, format_out, sink, anchor);
 
     if (!stream || !stream->isa) {
-	char *buffer = 0;
+	char *buffer = NULL;
 
 	fclose(zzfp);
 	if (LYCancelDownload) {
@@ -1922,7 +2034,7 @@ int HTParseBzFile(HTFormat rep_in,
     stream = HTStreamStack(rep_in, format_out, sink, anchor);
 
     if (!stream || !stream->isa) {
-	char *buffer = 0;
+	char *buffer = NULL;
 
 	HTCloseBzFile(bzfp);
 	if (LYCancelDownload) {
@@ -1999,7 +2111,7 @@ int HTParseBrFile(HTFormat rep_in,
     stream = HTStreamStack(rep_in, format_out, sink, anchor);
 
     if (!stream || !stream->isa) {
-	char *buffer = 0;
+	char *buffer = NULL;
 
 	fclose(brfp);
 	if (LYCancelDownload) {
@@ -2043,6 +2155,80 @@ int HTParseBrFile(HTFormat rep_in,
 #undef THIS_FUNC
 }
 #endif /* USE_BROTLI */
+
+#ifdef USE_ZSTD
+/*	HTParseZstdFile
+ *
+ *  State of file and target stream on entry:
+ *			FILE* (zfp) assumed open,
+ *			target (sink) usually NULL (will call stream stack).
+ *
+ *  Return values:
+ *	-501		Stream stack failed (cannot present or convert).
+ *	-1		Download cancelled.
+ *	HT_NO_DATA	Error before any data read.
+ *	HT_PARTIAL_CONTENT	Interruption or error after some data read.
+ *	HT_LOADED	Normal end of file indication on reading.
+ *
+ *  State of file and target stream on return:
+ *	always		zfp closed; target freed, aborted, or NULL.
+ */
+int HTParseZstdFile(HTFormat rep_in,
+		    HTFormat format_out,
+		    HTParentAnchor *anchor,
+		    FILE *zfp,
+		    HTStream *sink)
+{
+    HTStream *stream;
+    HTStreamClass targetClass;
+    int rv;
+    int result;
+
+    stream = HTStreamStack(rep_in, format_out, sink, anchor);
+
+    if (!stream || !stream->isa) {
+	char *buffer = NULL;
+
+	fclose(zfp);
+	if (LYCancelDownload) {
+	    LYCancelDownload = FALSE;
+	    result = -1;
+	} else {
+	    HTSprintf0(&buffer, CANNOT_CONVERT_I_TO_O,
+		       HTAtom_name(rep_in), HTAtom_name(format_out));
+	    CTRACE((tfp, "HTFormat(in HTParseZstdFile): %s\n", buffer));
+	    rv = HTLoadError(sink, 501, buffer);
+	    FREE(buffer);
+	    result = rv;
+	}
+    } else {
+	/*
+	 * Push the data down the stream
+	 *
+	 * @@ Bug:  This decision ought to be made based on "encoding" rather than
+	 * on content-type.  @@@ When we handle encoding.  The current method
+	 * smells anyway.
+	 */
+	targetClass = *(stream->isa);	/* Copy pointers to procedures */
+	rv = HTZstdFileCopy(zfp, stream);
+	if (rv == -1 || rv == HT_INTERRUPTED) {
+	    (*targetClass._abort) (stream, NULL);
+	} else {
+	    (*targetClass._free) (stream);
+	}
+
+	fclose(zfp);
+	if (rv == -1) {
+	    result = HT_NO_DATA;
+	} else if (rv == HT_INTERRUPTED || (rv > 0 && rv != HT_LOADED)) {
+	    result = HT_PARTIAL_CONTENT;
+	} else {
+	    result = HT_LOADED;
+	}
+    }
+    return result;
+}
+#endif /* USE_ZSTD */
 
 /*	Converter stream: Network Telnet to internal character text
  *	-----------------------------------------------------------

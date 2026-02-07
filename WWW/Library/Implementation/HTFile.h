@@ -1,5 +1,5 @@
 /*
- * $LynxId: HTFile.h,v 1.37 2024/05/27 10:08:57 tom Exp $
+ * $LynxId: HTFile.h,v 1.39 2025/01/06 15:13:11 tom Exp $
  *							File access in libwww
  *				FILE ACCESS
  *
@@ -214,6 +214,7 @@ extern "C" {
 	,cftBzip2
 	,cftDeflate
 	,cftBrotli
+	,cftZstd
     } CompressFileType;
 
 /*
@@ -336,6 +337,7 @@ extern "C" {
 	,ppUUDECODE
 	,ppZCAT
 	,ppZIP
+	,ppZSTD
 	,pp_Last
     } ProgramPaths;
 
@@ -345,7 +347,7 @@ extern "C" {
     extern const char *HTGetProgramPath(ProgramPaths code);
 
 /*
- * Store a program's path 
+ * Store a program's path
  */
     extern void HTSetProgramPath(ProgramPaths code,
 				 const char *path);

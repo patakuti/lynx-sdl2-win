@@ -53,8 +53,9 @@ STEP 2: CONFIGURE LYNX
 
    ./configure_win64.sh
 
-   Note: Enable EXP_WCWIDTH_SUPPORT in lynx_cfg.h after configure:
-       #define EXP_WCWIDTH_SUPPORT 1
+   Note: EXP_WCWIDTH_SUPPORT and USE_WCWIDTH_SUPPORT are automatically
+   enabled via CPPFLAGS in configure_win64.sh. No manual editing of
+   lynx_cfg.h is required.
 
 STEP 3: BUILD LYNX
 

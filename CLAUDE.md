@@ -11,6 +11,10 @@
   - ソースコードを修正した場合は、必ずbuildすること。
   - Gitのコミットメッセージ, PRは必ず英語で書く
   - PRはupstreamではなく、fork先 (patakuti/lynx-sdl2-win) に作成すること
+  - ブランチ構成
+    - origin/master: upstream (ThomasDickey/lynx-snapshots) の snapshot 履歴のみ。fork 独自の変更は含まない
+    - origin/main: fork 独自の開発ブランチ。PRの base は main を指定すること
+    - feature branch は main から作成すること
 
 - ビルド手順
   - configure し直すときは、必ず make distclean してから configure すること

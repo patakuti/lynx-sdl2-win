@@ -525,7 +525,8 @@ void save_bookmark_link(const char *address,
      */
     if (!first_time) {
 	BOOLEAN empty_file = TRUE;
-	FILE *bp = tmpfile();
+	FILE *bp;
+	char bp_temp[LY_MAXPATH];
 	char chunk[SCAN_LEN];
 	int ch;
 	int offset_Chr = 0;
@@ -540,6 +541,27 @@ void save_bookmark_link(const char *address,
 	char found_tag[scanIgnore + 1];
 	SCAN_TRAILING scanned = scanUnknown;
 
+	/* Use LYOpenTemp for portable temp file creation (tmpfile()
+	 * fails on Windows without admin privileges).  LYOpenTemp
+	 * opens write-only, so reopen as read+write binary.
+	 */
+	bp = LYOpenTemp(bp_temp, ".tmp", BIN_W);
+	if (bp != NULL) {
+	    LYCloseTempFP(bp);
+	    bp = fopen(bp_temp, "w+b");
+	}
+	if (bp == NULL) {
+	    LYMBM_statusline(BOOKMARK_OPEN_FAILED);
+	    LYSleepAlert();
+	    LYRemoveTemp(bp_temp);
+	    FREE(Title);
+	    FREE(Address);
+	    FREE(bookmark_URL);
+	    BStrFree(tmp_data);
+	    LYCloseOutput(fp);
+	    SetDefaultMode(O_BINARY);
+	    return;
+	}
 	rewind(fp);
 	memset(found_tag, 0, sizeof(found_tag));
 	while (scan_trailing(bp, fp, chunk, &matched, &comment, &scanned)) {
@@ -631,6 +653,7 @@ void save_bookmark_link(const char *address,
 	    ++offset_Chr;
 	}
 	fclose(bp);
+	LYRemoveTemp(bp_temp);
 
 	if (!found_tag[scanTailBody])
 	    StrAllocCat(trailing_tag, "</body>");

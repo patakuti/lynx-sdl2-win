@@ -2590,11 +2590,11 @@ static int LYgetch_for(int code)
 	 * in the switch above if they are obviously invalid when used as an
 	 * index into (e.g.) keypad[].  - KW
 	 *
-	 * However, for Unicode characters from IME input (e.g., Japanese),
-	 * we need to pass them through so they can be handled properly.
-	 * Unicode characters typically start at 0x80 and go up to 0x10FFFF.
+	 * Unicode characters (>= 0x80) are passed through as-is.  With LKC
+	 * flags now above the Unicode range (bit 22+), they will not be
+	 * misidentified as having flag bits set by downstream code.
 	 */
-	if (c >= 0x80 && c <= 0x10FFFF) {
+	if (c >= 0x80) {
 	    return (c);  /* Pass through Unicode characters */
 	}
 	return (0);

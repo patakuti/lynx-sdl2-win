@@ -58,16 +58,22 @@ extern "C" {
 #define KTL(c)		(CTL(c) + 1)
 
 /* * *  LynxKeyCodes  * * */
-#define LKC_ISLECLAC	0x8000	/* flag: contains lynxaction + editaction */
-#define LKC_MOD1	0x4000	/* a modifier bit - currently for ^x-map */
-#define LKC_MOD2	0x2000	/* another one - currently for esc-map */
-#define LKC_MOD3	0x1000	/* another one - currently for double-map */
-#define LKC_ISLAC	0x0800	/* flag: lynxkeycode already lynxactioncode */
+/*
+ * Flag bits are placed at bit 22+ to avoid overlap with the Unicode range
+ * (U+0000..U+10FFFF, 21 bits).  This ensures that Unicode characters
+ * (e.g., CJK ideographs from IME input) are never misidentified as having
+ * LKC flags set.
+ */
+#define LKC_ISLECLAC	0x8000000 /* flag: contains lynxaction + editaction */
+#define LKC_MOD1	0x4000000 /* a modifier bit - currently for ^x-map */
+#define LKC_MOD2	0x2000000 /* another one - currently for esc-map */
+#define LKC_MOD3	0x1000000 /* another one - currently for double-map */
+#define LKC_ISLAC	0x0800000 /* flag: lynxkeycode already lynxactioncode */
 
 /* Used to distinguish internal Lynx keycodes of (say) extended ncurses once. */
-#define LKC_ISLKC	0x0400	/* flag: already lynxkeycode (not native) */
+#define LKC_ISLKC	0x0400000 /* flag: already lynxkeycode (not native) */
     /* 0x0400  is MOUSE_KEYSYM for slang in LYStrings.c */
-#define LKC_MASK	0x07FF	/* mask for lynxkeycode proper */
+#define LKC_MASK	0x1FFFFF  /* mask for lynxkeycode proper (covers Unicode) */
 
 #define LKC_DONE	0x07FE	/* special value - operation done, not-a-key */
 
@@ -86,9 +92,12 @@ extern "C" {
 #define LKC2_TO_LEC(c)   (((c) == -1 || !((c) & LKC_ISLECLAC)) ? (c) : \
 			    ((((c)&~LKC_ISLECLAC)>>LAC_SHIFT) & LAC_MASK))
 
-/*  Convert lynxkeycode to lynxactioncode.  Modifiers are dropped.  */
+/*  Convert lynxkeycode to lynxactioncode.  Modifiers are dropped.
+ *  With LKC_MASK now covering Unicode, we must guard against out-of-bounds
+ *  array access for characters beyond KEYMAP_SIZE (e.g., CJK ideographs).  */
 #define LKC_TO_LAC(ktab,c) (((c) == -1) ? ktab[0] : \
 			    ((c) & (LKC_ISLECLAC|LKC_ISLAC)) ? ((c) & LAC_MASK) : \
+			    (((c) & LKC_MASK) + 1 >= KEYMAP_SIZE) ? 0 : \
 			    ktab[((c) & LKC_MASK) + 1])
 
 /*  Mask lynxactioncode as a lynxkeycode.  */

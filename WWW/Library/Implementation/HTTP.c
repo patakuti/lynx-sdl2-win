@@ -400,6 +400,10 @@ static BOOL acceptEncoding(int code)
 
 	switch (code) {
 	case encodingGZIP:
+#ifdef USE_ZLIB
+	    result = TRUE;
+	    break;
+#endif
 	    program = HTGetProgramPath(ppGZIP);
 	    break;
 	case encodingDEFLATE:
@@ -420,7 +424,8 @@ static BOOL acceptEncoding(int code)
 	default:
 	    break;
 	}
-	result = (BOOL) (program != NULL);
+	if (!result)
+	    result = (BOOL) (program != NULL);
     }
     return result;
 }

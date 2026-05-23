@@ -1426,6 +1426,10 @@ HTStream *HTCompressed(HTPresentation *pres,
 	    can_present = TRUE;
 	    switch (HTEncodingToCompressType(anchor->content_encoding)) {
 	    case cftGzip:
+#ifdef USE_ZLIB
+		compress_suffix = "gz";	/* zlib handles inline decompression */
+		break;
+#endif
 		if ((program = HTGetProgramPath(ppGZIP)) != NULL) {
 		    /*
 		     * It's compressed with the modern gzip.  - FM
@@ -1482,7 +1486,7 @@ HTStream *HTCompressed(HTPresentation *pres,
 	}
     }
     if (can_present == FALSE ||	/* no presentation mapping */
-	uncompress_mask == NULL ||	/* not gzip or compress */
+	(uncompress_mask == NULL && *compress_suffix == '\0') ||	/* not gzip or compress */
 	StrChr(anchor->content_type, ';') ||	/* wrong charset */
 	HTOutputFormat == WWW_DOWNLOAD ||	/* download */
 	!strcasecomp(pres->rep_out->name, STR_DOWNLOAD) ||	/* download */

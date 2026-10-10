@@ -1,5 +1,5 @@
 /*
- * $LynxId: HTNews.c,v 1.85 2025/07/22 00:34:58 tom Exp $
+ * $LynxId: HTNews.c,v 1.87 2026/05/25 16:55:26 tom Exp $
  *
  *			NEWS ACCESS				HTNews.c
  *			===========
@@ -19,6 +19,7 @@
 #include <HTTCP.h>
 #include <LYUtils.h>
 #include <LYStrings.h>
+#include <HTCJK.h>
 
 #define NEWS_PORT 119		/* See rfc977 */
 #define SNEWS_PORT 563		/* See Lou Montulli */
@@ -2431,7 +2432,7 @@ static int HTLoadNews(const char *arg,
 		    p1 = (strrchr(arg, ':') + 1);
 		}
 	    } else {
-		char *cp2;
+		const char *cp2;
 
 		/*
 		 * Reset p1 so that it points to the newsgroup (or a wildcard),

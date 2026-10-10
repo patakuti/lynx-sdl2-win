@@ -1,11 +1,12 @@
-# $LynxId: lynx.spec,v 1.120 2025/09/17 22:50:45 tom Exp $
+# $LynxId: lynx.spec,v 1.132 2026/05/31 09:47:39 tom Exp $
 Summary: A text-based Web browser
 Name: lynx-dev
-Version: 2.9.2
-Release: 22
+Version: 2.9.3
+%global test_version 2.9.3
+Release: 2
 License: GPL-2.0-only
 Group: Applications/Internet
-Source: https://invisible-island.net/archives/lynx/lynx%{version}.tgz
+Source: https://invisible-island.net/archives/lynx/lynx%{test_version}.tgz
 URL: https://lynx.invisible-island.net
 Provides: webclient >= 0.0
 Provides: text-www-browser >= 0.0
@@ -37,7 +38,7 @@ HTTP, FTP, WAIS, and NNTP servers.
 %prep
 
 %define debug_package %{nil}
-%setup -q -n lynx%{version}
+%setup -q -n lynx%{test_version}
 
 %build
 %configure \
@@ -102,8 +103,8 @@ strip $RPM_BUILD_ROOT%{_bindir}/%{name}
 
 %changelog
 
-* Wed Sep 17 2025 Thomas E. Dickey
-- testing lynx 2.9.2-22
+* Sun May 31 2026 Thomas E. Dickey
+- testing lynx 2.9.3-2
 
 * Thu Aug 01 2024 Thomas E. Dickey
 - add zstd compression

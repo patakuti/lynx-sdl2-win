@@ -1,5 +1,5 @@
 /*
- * $LynxId: HTAlert.c,v 1.107 2025/07/27 21:20:54 tom Exp $
+ * $LynxId: HTAlert.c,v 1.109 2026/05/24 15:16:48 WaitronCharm Exp $
  *
  *	Displaying messages and getting input for Lynx Browser
  *	==========================================================
@@ -58,6 +58,10 @@ void HTAlert(const char *Msg)
 	fprintf(stderr, ALERT_FORMAT, Msg);
 	fputc('\n', stderr);
 	fflush(stderr);
+    }
+
+    if (LYFailOnAlert) {
+	alert_occurred = TRUE;
     }
 
     LYSleepAlert();
@@ -949,7 +953,7 @@ BOOL HTConfirmCookie(domain_entry * de, const char *server,
 		 * (Y/N/Always/neVer)              - English (original)
 		 * (O/N/Toujours/Jamais)           - French
 		 */
-		char *p = gettext("Y/N/A/V");	/* placeholder for comment */
+		const char *p = gettext("Y/N/A/V");	/* placeholder for comment */
 		const char *s = "YNAV\007\003";		/* see ADVANCED_COOKIE_CONFIRMATION */
 
 		if (StrChr(s, ch) == NULL

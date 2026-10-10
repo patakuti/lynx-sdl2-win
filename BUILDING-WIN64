@@ -84,6 +84,13 @@ STEP 3: BUILD LYNX
    make
    cp src/lynx.exe win64-dist/
 
+   Note: Header dependencies are not tracked reliably by the generated
+   Makefiles.  After changing a header (for example, after merging
+   upstream changes that modify a struct such as LinkInfo in
+   src/LYStructs.h), run "make clean" before "make".  Otherwise stale
+   object files with a different struct layout remain linked in and
+   cause runtime crashes (e.g., in-page search).
+
 STEP 4: COPY REQUIRED DLLS
 
    Copy the following DLLs to win64-dist/:
